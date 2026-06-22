@@ -93,17 +93,11 @@
 | `access_token` | string | Bearer token |
 | `token_type` | string | 固定为 `Bearer` |
 | `expires_in` | integer | token 有效秒数 |
-| `member` | object | 用户信息 |
-
-`member` 字段：
-
-| 字段 | 类型 | 说明 |
-| --- | --- | --- |
-| `id` | integer | 用户 ID |
-| `openid` | string | 用户 openid |
-| `nickname` | string | 昵称 |
-| `phone` | string | 手机号 |
-| `is_active` | boolean | 是否启用 |
+| `member.id` | integer | 用户 ID |
+| `member.openid` | string | 用户 openid |
+| `member.nickname` | string | 昵称 |
+| `member.phone` | string | 手机号 |
+| `member.is_active` | boolean | 是否启用 |
 
 说明：
 
@@ -118,7 +112,17 @@
 
 认证：用户 token。
 
-响应 `data`：同 `member` 字段。
+请求参数：无路径参数、无查询参数、无请求体。
+
+响应 `data`：
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `id` | integer | 用户 ID |
+| `openid` | string | 用户 openid |
+| `nickname` | string | 昵称 |
+| `phone` | string | 手机号 |
+| `is_active` | boolean | 是否启用 |
 
 ### 2.3 更新用户资料
 
@@ -142,7 +146,15 @@
 }
 ```
 
-响应 `data`：更新后的用户信息。
+响应 `data`：
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `id` | integer | 用户 ID |
+| `openid` | string | 用户 openid |
+| `nickname` | string | 更新后的昵称 |
+| `phone` | string | 更新后的手机号 |
+| `is_active` | boolean | 是否启用 |
 
 ## 3. 学习宣传
 
@@ -171,6 +183,15 @@
 | `required_seconds` | integer | 要求学习秒数 |
 | `is_active` | boolean | 是否上架 |
 
+响应 `data` 分页字段：
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `items` | array | 学习内容列表 |
+| `total` | integer | 总数量 |
+| `page` | integer | 当前页码 |
+| `page_size` | integer | 每页数量 |
+
 ### 3.2 学习内容详情
 
 `GET /api/learning/contents/{content_id}`
@@ -183,7 +204,17 @@
 | --- | --- | --- |
 | `content_id` | integer | 内容 ID |
 
-响应 `data`：学习内容对象。
+响应 `data`：
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `id` | integer | 内容 ID |
+| `title` | string | 标题 |
+| `cover` | string | 封面图片 URL |
+| `body` | string | 正文 |
+| `points` | integer | 完成后发放积分 |
+| `required_seconds` | integer | 要求学习秒数 |
+| `is_active` | boolean | 是否上架 |
 
 ### 3.3 完成学习
 
@@ -222,9 +253,32 @@
 
 认证：用户 token。
 
-查询参数：`page`、`page_size`。
+查询参数：
 
-响应 `data.items[]`：学习记录对象。
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `page` | integer | 否 | 页码 |
+| `page_size` | integer | 否 | 每页数量 |
+
+响应 `data.items[]`：
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `id` | integer | 学习记录 ID |
+| `content_id` | integer | 内容 ID |
+| `learned_seconds` | integer | 已学习秒数 |
+| `is_completed` | boolean | 是否完成 |
+| `completed_at` | datetime/null | 完成时间 |
+| `point_record_id` | integer/null | 关联积分流水 ID |
+
+响应 `data` 分页字段：
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `items` | array | 学习记录列表 |
+| `total` | integer | 总数量 |
+| `page` | integer | 当前页码 |
+| `page_size` | integer | 每页数量 |
 
 ## 4. 随手拍上报
 
@@ -264,9 +318,36 @@
 
 认证：用户 token。
 
-查询参数：`page`、`page_size`。
+查询参数：
 
-响应 `data.items[]`：上报对象。
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `page` | integer | 否 | 页码 |
+| `page_size` | integer | 否 | 每页数量 |
+
+响应 `data.items[]`：
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `id` | integer | 上报 ID |
+| `title` | string | 标题 |
+| `description` | string | 描述 |
+| `image` | string | 图片 URL |
+| `location` | string | 位置 |
+| `points` | integer | 审核通过后可发放积分 |
+| `status` | string | `pending`、`approved`、`rejected` |
+| `review_comment` | string | 审核意见 |
+| `point_record_id` | integer/null | 关联积分流水 ID |
+| `created_at` | datetime | 创建时间 |
+
+响应 `data` 分页字段：
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `items` | array | 随手拍列表 |
+| `total` | integer | 总数量 |
+| `page` | integer | 当前页码 |
+| `page_size` | integer | 每页数量 |
 
 ### 4.3 随手拍详情
 
@@ -280,7 +361,20 @@
 | --- | --- | --- |
 | `report_id` | integer | 上报 ID，只能查看自己的上报 |
 
-响应 `data`：上报对象。
+响应 `data`：
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `id` | integer | 上报 ID |
+| `title` | string | 标题 |
+| `description` | string | 描述 |
+| `image` | string | 图片 URL |
+| `location` | string | 位置 |
+| `points` | integer | 审核通过后可发放积分 |
+| `status` | string | `pending`、`approved`、`rejected` |
+| `review_comment` | string | 审核意见 |
+| `point_record_id` | integer/null | 关联积分流水 ID |
+| `created_at` | datetime | 创建时间 |
 
 后台流程：
 
@@ -297,7 +391,12 @@
 
 认证：用户 token。
 
-查询参数：`page`、`page_size`。
+查询参数：
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `page` | integer | 否 | 页码 |
+| `page_size` | integer | 否 | 每页数量 |
 
 响应 `data.items[]`：
 
@@ -312,6 +411,15 @@
 | `points` | integer | 签到确认后发放积分 |
 | `status` | string | `draft`、`published`、`closed` |
 
+响应 `data` 分页字段：
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `items` | array | 活动列表 |
+| `total` | integer | 总数量 |
+| `page` | integer | 当前页码 |
+| `page_size` | integer | 每页数量 |
+
 说明：接口仅返回已发布活动。
 
 ### 5.2 活动详情
@@ -320,7 +428,24 @@
 
 认证：用户 token。
 
-响应 `data`：活动对象。
+路径参数：
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `activity_id` | integer | 活动 ID |
+
+响应 `data`：
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `id` | integer | 活动 ID |
+| `title` | string | 标题 |
+| `body` | string | 正文 |
+| `location` | string | 地点 |
+| `start_time` | datetime | 开始时间 |
+| `end_time` | datetime | 结束时间 |
+| `points` | integer | 签到确认后发放积分 |
+| `status` | string | `draft`、`published`、`closed` |
 
 ### 5.3 活动报名
 
@@ -328,7 +453,13 @@
 
 认证：用户 token。
 
-请求体：无。
+路径参数：
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `activity_id` | integer | 活动 ID |
+
+请求体字段：无。
 
 响应 `data`：
 
@@ -348,6 +479,12 @@
 `POST /api/activities/{activity_id}/checkin`
 
 认证：用户 token。
+
+路径参数：
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `activity_id` | integer | 活动 ID |
 
 请求：
 
@@ -380,9 +517,29 @@
 
 认证：用户 token。
 
-查询参数：`page`、`page_size`。
+查询参数：
 
-响应 `data.items[]`：报名对象。
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `page` | integer | 否 | 页码 |
+| `page_size` | integer | 否 | 每页数量 |
+
+响应 `data.items[]`：
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `id` | integer | 报名 ID |
+| `activity_id` | integer | 活动 ID |
+| `created_at` | datetime | 报名时间 |
+
+响应 `data` 分页字段：
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `items` | array | 报名记录列表 |
+| `total` | integer | 总数量 |
+| `page` | integer | 当前页码 |
+| `page_size` | integer | 每页数量 |
 
 后台流程：
 
@@ -401,7 +558,12 @@
 
 认证：用户 token。
 
-查询参数：`page`、`page_size`。
+查询参数：
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `page` | integer | 否 | 页码 |
+| `page_size` | integer | 否 | 每页数量 |
 
 响应 `data.items[]`：
 
@@ -414,6 +576,15 @@
 | `points` | integer | 审核通过后发放积分 |
 | `status` | string | `draft`、`published`、`closed` |
 
+响应 `data` 分页字段：
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `items` | array | 老人服务任务列表 |
+| `total` | integer | 总数量 |
+| `page` | integer | 当前页码 |
+| `page_size` | integer | 每页数量 |
+
 说明：接口仅返回已发布任务。
 
 ### 6.2 老人服务任务详情
@@ -422,13 +593,34 @@
 
 认证：用户 token。
 
-响应 `data`：老人服务任务对象。
+路径参数：
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `task_id` | integer | 老人服务任务 ID |
+
+响应 `data`：
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `id` | integer | 任务 ID |
+| `title` | string | 标题 |
+| `description` | string | 描述 |
+| `location` | string | 地点 |
+| `points` | integer | 审核通过后发放积分 |
+| `status` | string | `draft`、`published`、`closed` |
 
 ### 6.3 提交服务反馈
 
 `POST /api/elder-services/tasks/{task_id}/feedback`
 
 认证：用户 token。
+
+路径参数：
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `task_id` | integer | 老人服务任务 ID |
 
 请求：
 
@@ -462,9 +654,34 @@
 
 认证：用户 token。
 
-查询参数：`page`、`page_size`。
+查询参数：
 
-响应 `data.items[]`：服务反馈对象。
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `page` | integer | 否 | 页码 |
+| `page_size` | integer | 否 | 每页数量 |
+
+响应 `data.items[]`：
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `id` | integer | 反馈 ID |
+| `task_id` | integer | 任务 ID |
+| `content` | string | 反馈内容 |
+| `image` | string | 图片 URL |
+| `status` | string | `pending`、`approved`、`rejected` |
+| `review_comment` | string | 审核意见 |
+| `point_record_id` | integer/null | 关联积分流水 ID |
+| `created_at` | datetime | 创建时间 |
+
+响应 `data` 分页字段：
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `items` | array | 服务反馈列表 |
+| `total` | integer | 总数量 |
+| `page` | integer | 当前页码 |
+| `page_size` | integer | 每页数量 |
 
 后台流程：
 
@@ -494,7 +711,12 @@
 
 认证：用户 token。
 
-查询参数：`page`、`page_size`。
+查询参数：
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `page` | integer | 否 | 页码 |
+| `page_size` | integer | 否 | 每页数量 |
 
 响应 `data.items[]`：
 
@@ -507,6 +729,15 @@
 | `source_id` | string | 来源业务 ID |
 | `reason` | string | 变动原因 |
 | `created_at` | datetime | 创建时间 |
+
+响应 `data` 分页字段：
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `items` | array | 积分明细列表 |
+| `total` | integer | 总数量 |
+| `page` | integer | 当前页码 |
+| `page_size` | integer | 每页数量 |
 
 `source_type` 取值：
 
@@ -531,7 +762,12 @@
 
 认证：用户 token。
 
-查询参数：`page`、`page_size`。
+查询参数：
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `page` | integer | 否 | 页码 |
+| `page_size` | integer | 否 | 每页数量 |
 
 响应 `data.items[]`：
 
@@ -547,6 +783,15 @@
 | `is_active` | boolean | 是否上架 |
 | `created_at` | datetime | 创建时间 |
 
+响应 `data` 分页字段：
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `items` | array | 可兑换商品列表 |
+| `total` | integer | 总数量 |
+| `page` | integer | 当前页码 |
+| `page_size` | integer | 每页数量 |
+
 说明：接口仅返回上架商品。
 
 ### 8.2 可兑换商品详情
@@ -555,7 +800,25 @@
 
 认证：用户 token。
 
-响应 `data`：商品对象。
+路径参数：
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `product_id` | integer | 商品 ID |
+
+响应 `data`：
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `id` | integer | 商品 ID |
+| `merchant_id` | integer | 商户 ID |
+| `merchant_name` | string | 商户名称 |
+| `name` | string | 商品名称 |
+| `image` | string | 商品图片 URL |
+| `description` | string | 商品说明 |
+| `points_required` | integer | 兑换所需积分 |
+| `is_active` | boolean | 是否上架 |
+| `created_at` | datetime | 创建时间 |
 
 ### 8.3 使用积分兑换商品
 
@@ -563,7 +826,13 @@
 
 认证：用户 token。
 
-请求体：无。
+路径参数：
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `product_id` | integer | 商品 ID |
+
+请求体字段：无。
 
 响应 `data`：
 
@@ -593,9 +862,34 @@
 
 认证：用户 token。
 
-查询参数：`page`、`page_size`。
+查询参数：
 
-响应 `data.items[]`：兑换记录对象。
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `page` | integer | 否 | 页码 |
+| `page_size` | integer | 否 | 每页数量 |
+
+响应 `data.items[]`：
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `id` | integer | 兑换记录 ID |
+| `merchant_id` | integer | 商户 ID |
+| `product_id` | integer | 商品 ID |
+| `product_name` | string | 商品名称 |
+| `member_id` | integer | 用户 ID |
+| `points_spent` | integer | 消耗积分 |
+| `status` | string | `pending` 或 `completed` |
+| `created_at` | datetime | 创建时间 |
+
+响应 `data` 分页字段：
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `items` | array | 商品兑换记录列表 |
+| `total` | integer | 总数量 |
+| `page` | integer | 当前页码 |
+| `page_size` | integer | 每页数量 |
 
 ## 9. 商户端
 
@@ -616,9 +910,23 @@
 | `access_token` | string | 商户 Bearer token |
 | `token_type` | string | 固定为 `Bearer` |
 | `expires_in` | integer | token 有效秒数 |
-| `merchant` | object | 商户信息 |
+| `merchant.id` | integer | 商户 ID |
+| `merchant.openid` | string | 商户 openid |
+| `merchant.name` | string | 商户名称 |
+| `merchant.contact_name` | string | 联系人 |
+| `merchant.phone` | string | 手机号 |
+| `merchant.address` | string | 经营地址 |
+| `merchant.is_active` | boolean | 是否启用 |
 
-`merchant` 字段：
+### 9.2 当前商户信息
+
+`GET /api/merchant/me`
+
+认证：商户 token。
+
+请求参数：无路径参数、无查询参数、无请求体。
+
+响应 `data`：
 
 | 字段 | 类型 | 说明 |
 | --- | --- | --- |
@@ -630,23 +938,40 @@
 | `address` | string | 经营地址 |
 | `is_active` | boolean | 是否启用 |
 
-### 9.2 当前商户信息
-
-`GET /api/merchant/me`
-
-认证：商户 token。
-
-响应 `data`：商户信息。
-
 ### 9.3 商户商品兑换记录
 
 `GET /api/merchant/redemptions`
 
 认证：商户 token。
 
-查询参数：`page`、`page_size`。
+查询参数：
 
-响应 `data.items[]`：兑换记录对象，仅包含当前商户商品的兑换记录。
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `page` | integer | 否 | 页码 |
+| `page_size` | integer | 否 | 每页数量 |
+
+响应 `data.items[]`：
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `id` | integer | 兑换记录 ID |
+| `merchant_id` | integer | 商户 ID |
+| `product_id` | integer | 商品 ID |
+| `product_name` | string | 商品名称 |
+| `member_id` | integer | 用户 ID |
+| `points_spent` | integer | 消耗积分 |
+| `status` | string | `pending` 或 `completed` |
+| `created_at` | datetime | 创建时间 |
+
+响应 `data` 分页字段：
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `items` | array | 当前商户商品兑换记录列表 |
+| `total` | integer | 总数量 |
+| `page` | integer | 当前页码 |
+| `page_size` | integer | 每页数量 |
 
 ### 9.4 商户月度兑换汇总
 
@@ -681,17 +1006,13 @@
 
 认证：无。
 
-响应：
+请求参数：无路径参数、无查询参数、无请求体。
 
-```json
-{
-  "code": 0,
-  "message": "success",
-  "data": {
-    "status": "ok"
-  }
-}
-```
+响应 `data`：
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `status` | string | 服务状态，正常时为 `ok` |
 
 ## 11. 业务流程
 
