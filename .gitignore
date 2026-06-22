@@ -1,0 +1,16 @@
+.DS_Store
+__pycache__/
+*.py[cod]
+
+.venv/
+backend/.venv/
+
+backend/data/db.sqlite3
+backend/data/db.sqlite3-*
+backend/data/media/
+backend/data/staticfiles/
+
+.env
+backend/.env
+
+docs/**/.tmp_ocr/

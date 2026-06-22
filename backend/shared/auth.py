@@ -1,0 +1,121 @@
+from __future__ import annotations
+
+import base64
+import hashlib
+import hmac
+import json
+import time
+from dataclasses import dataclass
+from typing import Any
+
+from django.conf import settings
+
+
+class TokenError(Exception):
+    pass
+
+
+@dataclass(frozen=True)
+class TokenIdentity:
+    subject_type: str
+    openid: str
+    expires_at: int
+
+
+def issue_token(*, subject_type: str, openid: str) -> tuple[str, int]:
+    subject_type = subject_type.strip()
+    openid = openid.strip()
+    if subject_type not in {"member", "merchant"}:
+        raise TokenError("token 主体类型不支持")
+    if not openid:
+        raise TokenError("openid 不能为空")
+
+    expires_in = settings.ACCESS_TOKEN_EXPIRES_SECONDS
+    now = int(time.time())
+    payload = {
+        "subject_type": subject_type,
+        "openid": openid,
+        "iat": now,
+        "exp": now + expires_in,
+    }
+    return _encode_jwt(payload), expires_in
+
+
+def parse_token(token: str) -> TokenIdentity:
+    payload = _decode_jwt(token)
+    subject_type = str(payload.get("subject_type") or "").strip()
+    openid = str(payload.get("openid") or "").strip()
+    expires_at = int(payload.get("exp") or 0)
+
+    if subject_type not in {"member", "merchant"}:
+        raise TokenError("token 主体类型不支持")
+    if not openid:
+        raise TokenError("token 缺少身份")
+    if expires_at <= int(time.time()):
+        raise TokenError("token 已过期")
+    return TokenIdentity(subject_type=subject_type, openid=openid, expires_at=expires_at)
+
+
+def get_bearer_token(request) -> str:
+    authorization = request.headers.get("Authorization", "")
+    scheme, _, token = authorization.partition(" ")
+    if scheme.lower() != "bearer" or not token.strip():
+        raise TokenError("缺少 Bearer token")
+    return token.strip()
+
+
+def get_token_identity(request) -> TokenIdentity:
+    return parse_token(get_bearer_token(request))
+
+
+def _encode_jwt(payload: dict[str, Any]) -> str:
+    header_segment = _base64url_json({"alg": "HS256", "typ": "JWT"})
+    payload_segment = _base64url_json(payload)
+    signing_input = f"{header_segment}.{payload_segment}".encode()
+    signature = _sign(signing_input)
+    return f"{header_segment}.{payload_segment}.{_base64url_encode(signature)}"
+
+
+def _decode_jwt(token: str) -> dict[str, Any]:
+    try:
+        header_segment, payload_segment, signature_segment = token.split(".")
+    except ValueError as exc:
+        raise TokenError("token 格式错误") from exc
+
+    signing_input = f"{header_segment}.{payload_segment}".encode()
+    expected_signature = _base64url_encode(_sign(signing_input))
+    if not hmac.compare_digest(signature_segment, expected_signature):
+        raise TokenError("token 签名无效")
+
+    header = _base64url_json_loads(header_segment)
+    if header.get("alg") != "HS256":
+        raise TokenError("token 算法不支持")
+    return _base64url_json_loads(payload_segment)
+
+
+def _sign(value: bytes) -> bytes:
+    return hmac.new(settings.ACCESS_TOKEN_SECRET.encode(), value, hashlib.sha256).digest()
+
+
+def _base64url_json(value: dict[str, Any]) -> str:
+    raw = json.dumps(value, ensure_ascii=False, separators=(",", ":"), sort_keys=True).encode()
+    return _base64url_encode(raw)
+
+
+def _base64url_json_loads(value: str) -> dict[str, Any]:
+    try:
+        return json.loads(_base64url_decode(value))
+    except (json.JSONDecodeError, UnicodeDecodeError) as exc:
+        raise TokenError("token 载荷无效") from exc
+
+
+def _base64url_encode(value: bytes) -> str:
+    return base64.urlsafe_b64encode(value).rstrip(b"=").decode()
+
+
+def _base64url_decode(value: str) -> bytes:
+    padding = "=" * (-len(value) % 4)
+    try:
+        return base64.urlsafe_b64decode(value + padding)
+    except (ValueError, base64.binascii.Error) as exc:
+        raise TokenError("token base64 无效") from exc
