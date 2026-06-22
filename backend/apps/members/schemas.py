@@ -14,7 +14,6 @@ class MemberOut(Schema):
     openid: str
     nickname: str
     phone: str
-    role: str
     is_active: bool
 
 
@@ -28,4 +27,3 @@ class LoginOut(Schema):
 class ProfileIn(Schema):
     nickname: str = ""
     phone: str = ""
-    role: str

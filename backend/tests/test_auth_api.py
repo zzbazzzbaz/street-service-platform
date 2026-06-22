@@ -75,7 +75,7 @@ class AuthApiTests(TestCase):
 
         response = self.client.post(
             "/api/members/profile",
-            {"nickname": "张三", "phone": "13800000000", "role": "courier"},
+            {"nickname": "张三", "phone": "13800000000"},
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Bearer {token}",
         )
@@ -84,7 +84,6 @@ class AuthApiTests(TestCase):
         payload = response.json()
         self.assertEqual(payload["data"]["nickname"], "张三")
         self.assertEqual(payload["data"]["phone"], "13800000000")
-        self.assertEqual(payload["data"]["role"], "courier")
 
     def test_merchant_me_requires_merchant_token(self):
         Member.objects.create(openid="member-openid")

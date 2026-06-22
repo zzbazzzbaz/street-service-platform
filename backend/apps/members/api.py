@@ -48,7 +48,6 @@ def member_profile(request, payload: ProfileIn):
                 member,
                 nickname=payload.nickname,
                 phone=payload.phone,
-                role=payload.role,
             )
         )
     except TokenError as exc:

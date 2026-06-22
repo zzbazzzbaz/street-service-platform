@@ -7,7 +7,6 @@ def create_member(openid: str = "member-openid", **kwargs) -> Member:
     defaults = {
         "nickname": "测试用户",
         "phone": "13800000000",
-        "role": Member.Role.COURIER,
     }
     defaults.update(kwargs)
     return Member.objects.create(openid=openid, **defaults)

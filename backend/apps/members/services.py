@@ -13,7 +13,6 @@ def member_data(member: Member) -> dict:
         "openid": member.openid,
         "nickname": member.nickname,
         "phone": member.phone,
-        "role": member.role,
         "is_active": member.is_active,
     }
 
@@ -38,11 +37,8 @@ def wechat_login_placeholder(code: str) -> dict:
     raise BusinessError("正式微信登录暂未接入", code=40000)
 
 
-def update_profile(member: Member, *, nickname: str, phone: str, role: str) -> dict:
-    if role not in Member.Role.values:
-        raise BusinessError("用户角色不支持")
+def update_profile(member: Member, *, nickname: str, phone: str) -> dict:
     member.nickname = nickname.strip()
     member.phone = phone.strip()
-    member.role = role
-    member.save(update_fields=["nickname", "phone", "role"])
+    member.save(update_fields=["nickname", "phone"])
     return member_data(member)

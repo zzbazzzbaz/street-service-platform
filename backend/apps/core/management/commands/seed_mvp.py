@@ -26,7 +26,7 @@ class Command(BaseCommand):
 
         member, _ = Member.objects.update_or_create(
             openid="test-member-openid",
-            defaults={"nickname": "测试用户", "phone": "13800000000", "role": Member.Role.COURIER, "is_active": True},
+            defaults={"nickname": "测试用户", "phone": "13800000000", "is_active": True},
         )
         merchant, _ = Merchant.objects.update_or_create(
             openid="test-merchant-openid",

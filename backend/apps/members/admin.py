@@ -6,7 +6,7 @@ from shared.admin import BackendManagerAdminMixin
 
 @admin.register(Member)
 class MemberAdmin(BackendManagerAdminMixin):
-    list_display = ("id", "openid", "nickname", "phone", "role", "is_active", "created_at")
-    list_filter = ("role", "is_active", "created_at")
+    list_display = ("id", "openid", "nickname", "phone", "is_active", "created_at")
+    list_filter = ("is_active", "created_at")
     search_fields = ("openid", "nickname", "phone")
     readonly_fields = ("created_at",)
