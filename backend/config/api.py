@@ -1,8 +1,14 @@
 from ninja import NinjaAPI, Schema
 from ninja.errors import ValidationError
+from django.http import Http404
 
+from apps.activities.api import router as activities_router
+from apps.elder_services.api import router as elder_services_router
+from apps.learning.api import router as learning_router
 from apps.members.api import auth_router, router as members_router
-from apps.merchants.api import merchant_auth_router, merchant_router
+from apps.merchants.api import merchant_auth_router, merchant_router, product_router, redemption_router
+from apps.points.api import router as points_router
+from apps.reports.api import router as reports_router
 from shared.api import ErrorResponse, error_response
 from shared.api import SuccessResponse, success_response
 
@@ -19,6 +25,11 @@ def validation_errors(request, exc):
     return error_response(40000, "请求参数错误", status=400, errors=exc.errors)
 
 
+@api.exception_handler(Http404)
+def not_found_errors(request, exc):
+    return error_response(40400, "资源不存在", status=404)
+
+
 @api.get("/health", response=SuccessResponse[HealthOut], tags=["系统"])
 def health(request):
     return success_response({"status": "ok"})
@@ -26,5 +37,12 @@ def health(request):
 
 api.add_router("/auth", auth_router)
 api.add_router("/members", members_router)
+api.add_router("/learning", learning_router)
+api.add_router("/reports", reports_router)
+api.add_router("/activities", activities_router)
+api.add_router("/elder-services", elder_services_router)
+api.add_router("/points", points_router)
+api.add_router("/merchant-products", product_router)
+api.add_router("/product-redemptions", redemption_router)
 api.add_router("/merchant/auth", merchant_auth_router)
 api.add_router("/merchant", merchant_router)

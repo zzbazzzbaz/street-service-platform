@@ -23,5 +23,5 @@ class BackendManagerAdminMixin(admin.ModelAdmin):
             user
             and user.is_active
             and user.is_staff
-            and (user.is_superuser or getattr(user, "is_backend_manager", False))
+            and getattr(user, "is_backend_manager", False)
         )
