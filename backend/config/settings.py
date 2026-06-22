@@ -3,16 +3,27 @@ from pathlib import Path
 import environ
 
 
+# -----------------------------------------------------------------------------
+# Paths and environment
+# -----------------------------------------------------------------------------
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 env = environ.Env()
 env.read_env(BASE_DIR / ".env")
 
+
+# -----------------------------------------------------------------------------
+# Core settings
+# -----------------------------------------------------------------------------
 SECRET_KEY = env("DJANGO_SECRET_KEY", default="dev-only-change-me")
 DEBUG = env.bool("DJANGO_DEBUG", default=True)
 ALLOWED_HOSTS = env.list("DJANGO_ALLOWED_HOSTS", default=["127.0.0.1", "localhost", "testserver"])
 CSRF_TRUSTED_ORIGINS = env.list("DJANGO_CSRF_TRUSTED_ORIGINS", default=[])
 
+
+# -----------------------------------------------------------------------------
+# Applications and middleware
+# -----------------------------------------------------------------------------
 INSTALLED_APPS = [
     "simpleui",
     "django.contrib.admin",
@@ -45,6 +56,10 @@ MIDDLEWARE = [
 
 ROOT_URLCONF = "config.urls"
 
+
+# -----------------------------------------------------------------------------
+# Templates and ASGI/WSGI
+# -----------------------------------------------------------------------------
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
@@ -63,6 +78,10 @@ TEMPLATES = [
 WSGI_APPLICATION = "config.wsgi.application"
 ASGI_APPLICATION = "config.asgi.application"
 
+
+# -----------------------------------------------------------------------------
+# Database
+# -----------------------------------------------------------------------------
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.sqlite3",
@@ -70,6 +89,10 @@ DATABASES = {
     }
 }
 
+
+# -----------------------------------------------------------------------------
+# Authentication and localization
+# -----------------------------------------------------------------------------
 AUTH_PASSWORD_VALIDATORS = []
 AUTH_USER_MODEL = "accounts.User"
 
@@ -78,18 +101,34 @@ TIME_ZONE = "Asia/Shanghai"
 USE_I18N = True
 USE_TZ = True
 
+
+# -----------------------------------------------------------------------------
+# Static and media files
+# -----------------------------------------------------------------------------
 STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "data" / "staticfiles"
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "data" / "media"
 
+
+# -----------------------------------------------------------------------------
+# Django defaults
+# -----------------------------------------------------------------------------
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
+
+# -----------------------------------------------------------------------------
+# Miniprogram and WeChat integration
+# -----------------------------------------------------------------------------
 ACCESS_TOKEN_SECRET = env("ACCESS_TOKEN_SECRET", default=SECRET_KEY)
 ACCESS_TOKEN_EXPIRES_SECONDS = env.int("ACCESS_TOKEN_EXPIRES_SECONDS", default=7200)
 WECHAT_MINIAPP_APPID = env("WECHAT_MINIAPP_APPID", default="")
 WECHAT_MINIAPP_SECRET = env("WECHAT_MINIAPP_SECRET", default="")
 
+
+# -----------------------------------------------------------------------------
+# TinyMCE
+# -----------------------------------------------------------------------------
 TINYMCE_DEFAULT_CONFIG = {
     "height": 500,
     "menubar": "file edit view insert format tools table help",
@@ -98,4 +137,83 @@ TINYMCE_DEFAULT_CONFIG = {
     "language": "zh_CN",
     "promotion": False,
     "branding": False,
+}
+
+
+# -----------------------------------------------------------------------------
+# SimpleUI admin
+# -----------------------------------------------------------------------------
+SIMPLEUI_HOME_INFO = False
+SIMPLEUI_ANALYSIS = False
+SIMPLEUI_HOME_ACTION = False
+SIMPLEUI_CONFIG = {
+    "system_keep": False,
+    "menus": [
+        {
+            "name": "用户管理",
+            "icon": "fas fa-users",
+            "permission": "members.view_member",
+            "models": [
+                {"name": "小哥档案", "icon": "fas fa-user", "url": "/admin/members/member/", "permission": "members.view_member"},
+            ],
+        },
+        {
+            "name": "学习宣传",
+            "icon": "fas fa-book-open",
+            "permission": "learning.view_learningcontent",
+            "models": [
+                {"name": "学习内容", "icon": "fas fa-book", "url": "/admin/learning/learningcontent/", "permission": "learning.view_learningcontent"},
+                {"name": "学习记录", "icon": "fas fa-clipboard-list", "url": "/admin/learning/learningrecord/", "permission": "learning.view_learningrecord"},
+            ],
+        },
+        {
+            "name": "随手上报",
+            "icon": "fas fa-flag",
+            "permission": "reports.view_report",
+            "models": [
+                {"name": "上报记录", "icon": "fas fa-file-lines", "url": "/admin/reports/report/", "permission": "reports.view_report"},
+            ],
+        },
+        {
+            "name": "活动管理",
+            "icon": "fas fa-calendar-check",
+            "permission": "activities.view_activity",
+            "models": [
+                {"name": "活动", "icon": "fas fa-calendar-day", "url": "/admin/activities/activity/", "permission": "activities.view_activity"},
+                {"name": "报名记录", "icon": "fas fa-user-plus", "url": "/admin/activities/activitysignup/", "permission": "activities.view_activitysignup"},
+                {"name": "签到记录", "icon": "fas fa-clipboard-check", "url": "/admin/activities/activitycheckin/", "permission": "activities.view_activitycheckin"},
+            ],
+        },
+        {
+            "name": "助老服务",
+            "icon": "fas fa-hand-holding-heart",
+            "permission": "elder_services.view_elderservicetask",
+            "models": [
+                {"name": "服务任务", "icon": "fas fa-list-check", "url": "/admin/elder_services/elderservicetask/", "permission": "elder_services.view_elderservicetask"},
+                {"name": "服务反馈", "icon": "fas fa-comment-dots", "url": "/admin/elder_services/elderservicefeedback/", "permission": "elder_services.view_elderservicefeedback"},
+            ],
+        },
+        {
+            "name": "积分商城",
+            "icon": "fas fa-store",
+            "permission": "points.view_pointaccount",
+            "models": [
+                {"name": "积分账户", "icon": "fas fa-wallet", "url": "/admin/points/pointaccount/", "permission": "points.view_pointaccount"},
+                {"name": "积分流水", "icon": "fas fa-receipt", "url": "/admin/points/pointrecord/", "permission": "points.view_pointrecord"},
+                {"name": "人工调分", "icon": "fas fa-pen-to-square", "url": "/admin/points/manualpointadjustment/", "permission": "points.view_manualpointadjustment"},
+                {"name": "商户", "icon": "fas fa-shop", "url": "/admin/merchants/merchant/", "permission": "merchants.view_merchant"},
+                {"name": "商品", "icon": "fas fa-box", "url": "/admin/merchants/merchantproduct/", "permission": "merchants.view_merchantproduct"},
+                {"name": "兑换记录", "icon": "fas fa-gift", "url": "/admin/merchants/productredemption/", "permission": "merchants.view_productredemption"},
+            ],
+        },
+        {
+            "name": "后台账号",
+            "icon": "fas fa-user-shield",
+            "permission": "accounts.view_user",
+            "models": [
+                {"name": "后台账号", "icon": "fas fa-user-shield", "url": "/admin/accounts/user/", "permission": "accounts.view_user"},
+            ],
+        },
+    ],
+    "dynamic": False,
 }
