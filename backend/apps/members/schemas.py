@@ -1,12 +1,9 @@
 from ninja import Schema
 
 
-class TestLoginIn(Schema):
-    openid: str
-
-
 class WechatLoginIn(Schema):
-    code: str
+    openid: str = ""
+    code: str = ""
 
 
 class MemberOut(Schema):

@@ -59,21 +59,30 @@
 
 ## 2. 认证与账号
 
-### 2.1 用户测试登录
+### 2.1 用户登录
 
-`POST /api/auth/test-login`
+`POST /api/auth/wechat-login`
 
 请求：
 
 | 字段 | 类型 | 必填 | 说明 |
 | --- | --- | --- | --- |
-| `openid` | string | 是 | 开发期测试 openid，不能为空 |
+| `openid` | string | 否 | 开发期测试 openid；有值时创建或获取用户并签发 token |
+| `code` | string | 否 | 微信临时登录 code；正式微信登录预留 |
 
-请求示例：
+开发期测试登录请求示例：
 
 ```json
 {
   "openid": "test-openid"
+}
+```
+
+正式微信登录请求形态：
+
+```json
+{
+  "code": "wx-code"
 }
 ```
 
@@ -96,22 +105,14 @@
 | `phone` | string | 手机号 |
 | `is_active` | boolean | 是否启用 |
 
-### 2.2 微信登录占位接口
-
-`POST /api/auth/wechat-login`
-
-请求：
-
-| 字段 | 类型 | 必填 | 说明 |
-| --- | --- | --- | --- |
-| `code` | string | 是 | 微信临时登录 code |
-
 说明：
 
+- `openid` 和 `code` 至少传一个。
+- 传入 `openid` 时走开发期测试登录。
 - 未配置 `WECHAT_MINIAPP_APPID` 或 `WECHAT_MINIAPP_SECRET` 时返回业务错误：`微信登录未配置，开发期请使用测试登录`。
-- 一期保留接口形态，不接入正式微信登录。
+- 一期保留 `code` 请求形态，不接入正式微信登录。
 
-### 2.3 当前用户信息
+### 2.2 当前用户信息
 
 `GET /api/members/me`
 
@@ -119,7 +120,7 @@
 
 响应 `data`：同 `member` 字段。
 
-### 2.4 更新用户资料
+### 2.3 更新用户资料
 
 `POST /api/members/profile`
 
@@ -698,7 +699,7 @@
 
 ```mermaid
 flowchart TD
-    A[小程序输入测试 openid] --> B[POST /api/auth/test-login]
+    A[小程序输入测试 openid] --> B[POST /api/auth/wechat-login]
     B --> C[后端创建或获取 Member]
     C --> D[签发 member token]
     D --> E[GET /api/members/me]
@@ -784,7 +785,6 @@ flowchart TD
 | 方法 | 路径 | 认证 |
 | --- | --- | --- |
 | `GET` | `/api/health` | 无 |
-| `POST` | `/api/auth/test-login` | 无 |
 | `POST` | `/api/auth/wechat-login` | 无 |
 | `GET` | `/api/members/me` | 用户 token |
 | `POST` | `/api/members/profile` | 用户 token |

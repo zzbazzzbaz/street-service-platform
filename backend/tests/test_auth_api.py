@@ -12,8 +12,8 @@ class AuthApiTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json(), {"code": 0, "message": "success", "data": {"status": "ok"}})
 
-    def test_member_test_login_creates_member_and_returns_token(self):
-        response = self.client.post("/api/auth/test-login", {"openid": "member-openid"}, content_type="application/json")
+    def test_wechat_login_accepts_openid_for_dev_login(self):
+        response = self.client.post("/api/auth/wechat-login", {"openid": "member-openid"}, content_type="application/json")
 
         self.assertEqual(response.status_code, 200)
         payload = response.json()
@@ -22,8 +22,8 @@ class AuthApiTests(TestCase):
         self.assertEqual(payload["data"]["member"]["openid"], "member-openid")
         self.assertTrue(Member.objects.filter(openid="member-openid").exists())
 
-    def test_member_test_login_validation_error_uses_unified_response(self):
-        response = self.client.post("/api/auth/test-login", {}, content_type="application/json")
+    def test_wechat_login_validation_error_uses_unified_response(self):
+        response = self.client.post("/api/auth/wechat-login", {}, content_type="application/json")
 
         self.assertEqual(response.status_code, 400)
         payload = response.json()
@@ -109,3 +109,8 @@ class AuthApiTests(TestCase):
         self.assertEqual(response.status_code, 400)
         self.assertEqual(response.json()["code"], 40000)
         self.assertIn("未配置", response.json()["message"])
+
+    def test_member_test_login_endpoint_is_removed(self):
+        response = self.client.post("/api/auth/test-login", {"openid": "member-openid"}, content_type="application/json")
+
+        self.assertEqual(response.status_code, 404)

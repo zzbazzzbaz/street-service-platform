@@ -32,6 +32,9 @@ def test_login(openid: str) -> dict:
 
 
 def wechat_login_placeholder(code: str) -> dict:
+    code = code.strip()
+    if not code:
+        raise BusinessError("openid 或 code 不能为空", code=40000)
     if not settings.WECHAT_MINIAPP_APPID or not settings.WECHAT_MINIAPP_SECRET:
         raise BusinessError("微信登录未配置，开发期请使用测试登录", code=40000)
     raise BusinessError("正式微信登录暂未接入", code=40000)

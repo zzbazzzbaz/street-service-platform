@@ -1,6 +1,6 @@
 from ninja import Router
 
-from apps.members.schemas import LoginOut, MemberOut, ProfileIn, TestLoginIn, WechatLoginIn
+from apps.members.schemas import LoginOut, MemberOut, ProfileIn, WechatLoginIn
 from apps.members.services import member_data, test_login, update_profile, wechat_login_placeholder
 from shared.api import ErrorResponse, SuccessResponse, error_response, success_response
 from shared.auth import TokenError
@@ -12,17 +12,11 @@ auth_router = Router(tags=["认证"])
 router = Router(tags=["用户"])
 
 
-@auth_router.post("/test-login", response={200: SuccessResponse[LoginOut], 400: ErrorResponse})
-def member_test_login(request, payload: TestLoginIn):
-    try:
-        return success_response(test_login(payload.openid))
-    except BusinessError as exc:
-        return error_response(exc.code, exc.message, status=exc.status, errors=exc.errors)
-
-
 @auth_router.post("/wechat-login", response={200: SuccessResponse[LoginOut], 400: ErrorResponse})
 def wechat_login(request, payload: WechatLoginIn):
     try:
+        if payload.openid.strip():
+            return success_response(test_login(payload.openid))
         return success_response(wechat_login_placeholder(payload.code))
     except BusinessError as exc:
         return error_response(exc.code, exc.message, status=exc.status, errors=exc.errors)
