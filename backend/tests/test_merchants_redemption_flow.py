@@ -92,3 +92,36 @@ class MerchantsRedemptionFlowTests(TestCase):
         self.assertEqual(merchant_records_response.status_code, 200)
         self.assertEqual(summary_response.status_code, 200)
         self.assertEqual(summary_response.json()["data"]["redemption_count"], 1)
+
+    def test_merchant_completes_own_pending_redemption_after_delivery(self):
+        add_points(self.member, 50, source_type=PointRecord.SourceType.MANUAL, reason="测试加分")
+        redemption = redeem_product(self.member, self.product)
+        merchant_headers = auth_header("merchant", self.merchant.openid)
+
+        response = self.client.post(
+            f"/api/merchant/redemptions/{redemption.id}/complete",
+            {},
+            content_type="application/json",
+            **merchant_headers,
+        )
+
+        redemption.refresh_from_db()
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["data"]["status"], ProductRedemption.Status.COMPLETED)
+        self.assertEqual(redemption.status, ProductRedemption.Status.COMPLETED)
+
+    def test_merchant_cannot_complete_other_merchant_redemption(self):
+        add_points(self.member, 50, source_type=PointRecord.SourceType.MANUAL, reason="测试加分")
+        redemption = redeem_product(self.member, self.product)
+        other_merchant_headers = auth_header("merchant", self.other_merchant.openid)
+
+        response = self.client.post(
+            f"/api/merchant/redemptions/{redemption.id}/complete",
+            {},
+            content_type="application/json",
+            **other_merchant_headers,
+        )
+
+        redemption.refresh_from_db()
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(redemption.status, ProductRedemption.Status.PENDING)

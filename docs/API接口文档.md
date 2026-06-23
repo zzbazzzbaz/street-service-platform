@@ -899,15 +899,32 @@
 
 ## 9. 商户端
 
-### 9.1 商户测试登录
+### 9.1 商户登录
 
-`POST /api/merchant/auth/test-login`
+`POST /api/merchant/auth/wechat-login`
 
 请求：
 
 | 字段 | 类型 | 必填 | 说明 |
 | --- | --- | --- | --- |
-| `openid` | string | 是 | 开发期测试商户 openid，不能为空 |
+| `openid` | string | 否 | 开发期测试商户 openid；有值时创建或获取商户并签发 token |
+| `code` | string | 否 | 微信临时登录 code；正式微信登录预留 |
+
+开发期测试登录请求示例：
+
+```json
+{
+  "openid": "merchant-openid"
+}
+```
+
+正式微信登录请求形态：
+
+```json
+{
+  "code": "wx-code"
+}
+```
 
 响应 `data`：
 
@@ -923,6 +940,13 @@
 | `merchant.phone` | string | 手机号 |
 | `merchant.address` | string | 经营地址 |
 | `merchant.is_active` | boolean | 是否启用 |
+
+说明：
+
+- `openid` 和 `code` 至少传一个。
+- 传入 `openid` 时走开发期测试登录。
+- 未配置 `WECHAT_MINIAPP_APPID` 或 `WECHAT_MINIAPP_SECRET` 时返回业务错误：`商户微信登录未配置，开发期请使用测试登录`。
+- 一期保留 `code` 请求形态，不接入正式微信登录。
 
 ### 9.2 当前商户信息
 
@@ -979,7 +1003,41 @@
 | `page` | integer | 当前页码 |
 | `page_size` | integer | 每页数量 |
 
-### 9.4 商户月度兑换汇总
+### 9.4 商户确认商品交付
+
+`POST /api/merchant/redemptions/{redemption_id}/complete`
+
+认证：商户 token。
+
+路径参数：
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `redemption_id` | integer | 商品兑换记录 ID |
+
+请求参数：无查询参数、无请求体。
+
+响应 `data`：
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `id` | integer | 兑换记录 ID |
+| `merchant_id` | integer | 商户 ID |
+| `product_id` | integer | 商品 ID |
+| `product_name` | string | 商品名称 |
+| `member_id` | integer | 用户 ID |
+| `points_spent` | integer | 消耗积分 |
+| `status` | string | 固定返回 `completed` |
+| `created_at` | datetime | 创建时间 |
+
+业务规则：
+
+- 只能确认当前登录商户自己的兑换记录。
+- 商户向用户交付商品后调用本接口完成核销。
+- 已完成的兑换记录不能重复确认。
+- 访问其他商户的兑换记录返回 `404`。
+
+### 9.5 商户月度兑换汇总
 
 `GET /api/merchant/redemptions/summary`
 
@@ -1102,9 +1160,11 @@ flowchart TD
     E -->|否| F[返回积分余额不足]
     E -->|是| G[扣减积分并生成流水]
     G --> H[生成 pending 兑换记录]
-    H --> I[商户 POST /api/merchant/auth/test-login]
-    I --> J[GET /api/merchant/redemptions 查看记录]
-    J --> K[GET /api/merchant/redemptions/summary?month=YYYY-MM 查看月度汇总]
+    H --> I[商户 POST /api/merchant/auth/wechat-login]
+    I --> J[GET /api/merchant/redemptions 查看待交付记录]
+    J --> K[商户交付商品]
+    K --> L[POST /api/merchant/redemptions/id/complete 确认核销]
+    L --> M[GET /api/merchant/redemptions/summary?month=YYYY-MM 查看月度汇总]
 ```
 
 ## 12. 当前实际接口清单

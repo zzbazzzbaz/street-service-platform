@@ -31,9 +31,9 @@ class AuthApiTests(TestCase):
         self.assertIn("message", payload)
         self.assertIn("errors", payload)
 
-    def test_merchant_test_login_creates_merchant_and_returns_token(self):
+    def test_merchant_wechat_login_accepts_openid_for_dev_login(self):
         response = self.client.post(
-            "/api/merchant/auth/test-login",
+            "/api/merchant/auth/wechat-login",
             {"openid": "merchant-openid"},
             content_type="application/json",
         )
@@ -44,6 +44,26 @@ class AuthApiTests(TestCase):
         self.assertEqual(payload["data"]["token_type"], "Bearer")
         self.assertEqual(payload["data"]["merchant"]["openid"], "merchant-openid")
         self.assertTrue(Merchant.objects.filter(openid="merchant-openid").exists())
+
+    def test_merchant_wechat_login_placeholder_reports_missing_config(self):
+        response = self.client.post(
+            "/api/merchant/auth/wechat-login",
+            {"code": "wx-code"},
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json()["code"], 40000)
+        self.assertIn("未配置", response.json()["message"])
+
+    def test_merchant_test_login_endpoint_is_removed(self):
+        response = self.client.post(
+            "/api/merchant/auth/test-login",
+            {"openid": "merchant-openid"},
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 404)
 
     def test_member_me_requires_token(self):
         response = self.client.get("/api/members/me")

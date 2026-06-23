@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from django.conf import settings
 from django.db import transaction
 from django.db.models import Count, Sum
 from django.utils import timezone
@@ -38,6 +39,15 @@ def test_login(openid: str) -> dict:
     }
 
 
+def wechat_login_placeholder(code: str) -> dict:
+    code = code.strip()
+    if not code:
+        raise BusinessError("openid 或 code 不能为空", code=40000)
+    if not settings.WECHAT_MINIAPP_APPID or not settings.WECHAT_MINIAPP_SECRET:
+        raise BusinessError("商户微信登录未配置，开发期请使用测试登录", code=40000)
+    raise BusinessError("商户微信登录暂未接入", code=40000)
+
+
 def product_data(product: MerchantProduct, request=None) -> dict:
     from shared.media import file_url
 
@@ -65,6 +75,16 @@ def redemption_data(redemption: ProductRedemption) -> dict:
         "status": redemption.status,
         "created_at": redemption.created_at,
     }
+
+
+@transaction.atomic
+def complete_redemption(redemption: ProductRedemption) -> ProductRedemption:
+    redemption = ProductRedemption.objects.select_for_update().select_related("merchant", "product").get(pk=redemption.pk)
+    if redemption.status == ProductRedemption.Status.COMPLETED:
+        raise BusinessError("兑换记录已完成")
+    redemption.status = ProductRedemption.Status.COMPLETED
+    redemption.save(update_fields=["status"])
+    return redemption
 
 
 @transaction.atomic

@@ -2,7 +2,7 @@ from django.contrib import admin
 
 from apps.activities.models import Activity, ActivityCheckin, ActivitySignup
 from apps.activities.services import review_checkin
-from shared.admin import BackendManagerAdminMixin
+from shared.admin import BackendManagerAdminMixin, admin_image_preview
 
 
 @admin.register(Activity)
@@ -10,7 +10,11 @@ class ActivityAdmin(BackendManagerAdminMixin):
     list_display = ("id", "title", "location", "status", "points", "start_time", "end_time")
     list_filter = ("status", "start_time", "end_time")
     search_fields = ("title", "location")
-    readonly_fields = ("checkin_code", "checkin_qr_image", "created_at")
+    readonly_fields = ("checkin_code", "checkin_qr_image", "checkin_qr_preview", "created_at")
+
+    @admin.display(description="签到二维码预览")
+    def checkin_qr_preview(self, obj):
+        return admin_image_preview(obj.checkin_qr_image)
 
 
 @admin.register(ActivitySignup)

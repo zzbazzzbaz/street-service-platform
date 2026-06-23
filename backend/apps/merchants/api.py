@@ -1,18 +1,18 @@
 from ninja import Router
 from django.shortcuts import get_object_or_404
 
-from apps.merchants.models import MerchantProduct
+from apps.merchants.models import MerchantProduct, ProductRedemption
 from apps.merchants.schemas import (
     MerchantLoginOut,
     MerchantOut,
     MerchantProductOut,
     MerchantProductsData,
     MerchantRedemptionSummaryOut,
-    MerchantTestLoginIn,
+    MerchantWechatLoginIn,
     ProductRedemptionOut,
     ProductRedemptionsData,
 )
-from apps.merchants.services import merchant_data, merchant_redemption_summary, product_data, redeem_product, redemption_data, test_login
+from apps.merchants.services import complete_redemption, merchant_data, merchant_redemption_summary, product_data, redeem_product, redemption_data, test_login, wechat_login_placeholder
 from shared.api import ErrorResponse, SuccessResponse, error_response, success_response
 from shared.auth import TokenError
 from shared.exceptions import BusinessError
@@ -27,10 +27,12 @@ product_router = Router(tags=["商品兑换"])
 redemption_router = Router(tags=["商品兑换记录"])
 
 
-@merchant_auth_router.post("/test-login", response={200: SuccessResponse[MerchantLoginOut], 400: ErrorResponse})
-def merchant_test_login(request, payload: MerchantTestLoginIn):
+@merchant_auth_router.post("/wechat-login", response={200: SuccessResponse[MerchantLoginOut], 400: ErrorResponse})
+def merchant_wechat_login(request, payload: MerchantWechatLoginIn):
     try:
-        return success_response(test_login(payload.openid))
+        if payload.openid.strip():
+            return success_response(test_login(payload.openid))
+        return success_response(wechat_login_placeholder(payload.code))
     except BusinessError as exc:
         return error_response(exc.code, exc.message, status=exc.status, errors=exc.errors)
 
@@ -105,6 +107,18 @@ def merchant_redemptions(request, page: int = 1, page_size: int = 20):
         return error_response(exc.code, exc.message, status=exc.status, errors=exc.errors)
     items, page_data = paginate_queryset(merchant.redemptions.select_related("member", "product"), page=page, page_size=page_size)
     return success_response({"items": [redemption_data(item) for item in items], **page_data})
+
+
+@merchant_router.post("/redemptions/{redemption_id}/complete", response={200: SuccessResponse[ProductRedemptionOut], 400: ErrorResponse, 401: ErrorResponse, 403: ErrorResponse, 404: ErrorResponse})
+def merchant_complete_redemption(request, redemption_id: int):
+    try:
+        merchant = authenticate_merchant(request)
+        redemption = get_object_or_404(ProductRedemption.objects.select_related("merchant", "product"), pk=redemption_id, merchant=merchant)
+        return success_response(redemption_data(complete_redemption(redemption)))
+    except TokenError as exc:
+        return error_response(40001, str(exc), status=401)
+    except BusinessError as exc:
+        return error_response(exc.code, exc.message, status=exc.status, errors=exc.errors)
 
 
 @merchant_router.get("/redemptions/summary", response={200: SuccessResponse[MerchantRedemptionSummaryOut], 400: ErrorResponse, 401: ErrorResponse, 403: ErrorResponse})

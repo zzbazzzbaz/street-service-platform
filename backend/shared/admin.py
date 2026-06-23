@@ -1,4 +1,24 @@
 from django.contrib import admin
+from django.utils.html import format_html
+
+
+def admin_image_preview(file_field, *, empty_text: str = "暂无图片", size: int = 160):
+    if not file_field:
+        return empty_text
+    try:
+        url = file_field.url
+    except ValueError:
+        return empty_text
+    return format_html(
+        '<a href="{}" target="_blank" rel="noopener">'
+        '<img src="{}" style="max-width:{}px;max-height:{}px;border:1px solid #ddd;border-radius:4px;" />'
+        '</a><br><a href="{}" target="_blank" rel="noopener">打开原图</a>',
+        url,
+        url,
+        size,
+        size,
+        url,
+    )
 
 
 class BackendManagerAdminMixin(admin.ModelAdmin):

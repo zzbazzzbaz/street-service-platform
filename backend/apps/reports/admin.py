@@ -2,7 +2,7 @@ from django.contrib import admin
 
 from apps.reports.models import Report
 from apps.reports.services import review_report
-from shared.admin import BackendManagerAdminMixin
+from shared.admin import BackendManagerAdminMixin, admin_image_preview
 
 
 @admin.register(Report)
@@ -10,7 +10,11 @@ class ReportAdmin(BackendManagerAdminMixin):
     list_display = ("id", "member", "title", "location", "status", "points", "created_at")
     list_filter = ("status", "created_at")
     search_fields = ("member__openid", "member__nickname", "title", "location")
-    readonly_fields = ("point_record", "created_at", "updated_at")
+    readonly_fields = ("image_preview", "point_record", "created_at", "updated_at")
+
+    @admin.display(description="图片预览")
+    def image_preview(self, obj):
+        return admin_image_preview(obj.image)
 
     def save_model(self, request, obj, form, change):
         if change:

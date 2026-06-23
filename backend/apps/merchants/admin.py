@@ -1,7 +1,7 @@
 from django.contrib import admin
 
 from apps.merchants.models import Merchant, MerchantProduct, ProductRedemption
-from shared.admin import BackendManagerAdminMixin
+from shared.admin import BackendManagerAdminMixin, admin_image_preview
 
 
 @admin.register(Merchant)
@@ -17,7 +17,11 @@ class MerchantProductAdmin(BackendManagerAdminMixin):
     list_display = ("id", "merchant", "name", "points_required", "is_active", "created_at")
     list_filter = ("is_active", "created_at")
     search_fields = ("merchant__name", "name")
-    readonly_fields = ("created_at",)
+    readonly_fields = ("image_preview", "created_at")
+
+    @admin.display(description="商品图片预览")
+    def image_preview(self, obj):
+        return admin_image_preview(obj.image)
 
 
 @admin.register(ProductRedemption)

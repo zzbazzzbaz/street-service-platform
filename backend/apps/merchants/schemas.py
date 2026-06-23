@@ -2,8 +2,9 @@ from ninja import Schema
 from datetime import datetime
 
 
-class MerchantTestLoginIn(Schema):
-    openid: str
+class MerchantWechatLoginIn(Schema):
+    openid: str = ""
+    code: str = ""
 
 
 class MerchantOut(Schema):

@@ -1,7 +1,9 @@
 from django.contrib import admin
+from django.db import models
+from tinymce.widgets import TinyMCE
 
 from apps.learning.models import LearningContent, LearningRecord
-from shared.admin import BackendManagerAdminMixin
+from shared.admin import BackendManagerAdminMixin, admin_image_preview
 
 
 @admin.register(LearningContent)
@@ -9,7 +11,16 @@ class LearningContentAdmin(BackendManagerAdminMixin):
     list_display = ("id", "title", "points", "required_seconds", "is_active", "created_at")
     list_filter = ("is_active", "created_at")
     search_fields = ("title",)
-    readonly_fields = ("created_at",)
+    readonly_fields = ("cover_preview", "created_at")
+
+    @admin.display(description="封面预览")
+    def cover_preview(self, obj):
+        return admin_image_preview(obj.cover)
+
+    def formfield_for_dbfield(self, db_field, request, **kwargs):
+        if db_field.name == "body" and isinstance(db_field, models.TextField):
+            kwargs["widget"] = TinyMCE()
+        return super().formfield_for_dbfield(db_field, request, **kwargs)
 
 
 @admin.register(LearningRecord)
