@@ -1,4 +1,6 @@
 from django.contrib import admin
+from django.db import models
+from tinymce.widgets import TinyMCE
 
 from apps.activities.models import Activity, ActivityCheckin, ActivitySignup
 from apps.activities.services import review_checkin
@@ -15,6 +17,11 @@ class ActivityAdmin(BackendManagerAdminMixin):
     @admin.display(description="签到二维码预览")
     def checkin_qr_preview(self, obj):
         return admin_image_preview(obj.checkin_qr_image)
+
+    def formfield_for_dbfield(self, db_field, request, **kwargs):
+        if db_field.name == "body" and isinstance(db_field, models.TextField):
+            kwargs["widget"] = TinyMCE()
+        return super().formfield_for_dbfield(db_field, request, **kwargs)
 
 
 @admin.register(ActivitySignup)

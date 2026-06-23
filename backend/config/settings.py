@@ -135,8 +135,15 @@ TINYMCE_DEFAULT_CONFIG = {
     "plugins": "advlist autolink lists link image charmap preview anchor searchreplace visualblocks code fullscreen media table help wordcount",
     "toolbar": "undo redo | blocks | bold italic | alignleft aligncenter alignright | bullist numlist | image link media | code",
     "language": "zh_CN",
+    "automatic_uploads": True,
+    "images_upload_url": "/admin/tinymce/upload/image/",
+    "file_picker_types": "image media",
+    "file_picker_callback": "streetServiceTinymceFilePicker",
     "promotion": False,
     "branding": False,
+}
+TINYMCE_EXTRA_MEDIA = {
+    "js": ["admin/js/tinymce_upload.js"],
 }
 
 
