@@ -1166,38 +1166,3 @@ flowchart TD
     K --> L[POST /api/merchant/redemptions/id/complete 确认核销]
     L --> M[GET /api/merchant/redemptions/summary?month=YYYY-MM 查看月度汇总]
 ```
-
-## 12. 当前实际接口清单
-
-| 方法 | 路径 | 认证 |
-| --- | --- | --- |
-| `GET` | `/api/health` | 无 |
-| `POST` | `/api/auth/wechat-login` | 无 |
-| `GET` | `/api/members/me` | 用户 token |
-| `POST` | `/api/members/profile` | 用户 token |
-| `GET` | `/api/learning/contents` | 用户 token |
-| `GET` | `/api/learning/contents/{content_id}` | 用户 token |
-| `POST` | `/api/learning/contents/{content_id}/complete` | 用户 token |
-| `GET` | `/api/learning/records` | 用户 token |
-| `GET` | `/api/reports` | 用户 token |
-| `POST` | `/api/reports` | 用户 token |
-| `GET` | `/api/reports/{report_id}` | 用户 token |
-| `GET` | `/api/activities` | 用户 token |
-| `GET` | `/api/activities/my-signups` | 用户 token |
-| `GET` | `/api/activities/{activity_id}` | 用户 token |
-| `POST` | `/api/activities/{activity_id}/signup` | 用户 token |
-| `POST` | `/api/activities/{activity_id}/checkin` | 用户 token |
-| `GET` | `/api/elder-services/tasks` | 用户 token |
-| `GET` | `/api/elder-services/tasks/{task_id}` | 用户 token |
-| `POST` | `/api/elder-services/tasks/{task_id}/feedback` | 用户 token |
-| `GET` | `/api/elder-services/feedbacks` | 用户 token |
-| `GET` | `/api/points/balance` | 用户 token |
-| `GET` | `/api/points/records` | 用户 token |
-| `GET` | `/api/merchant-products` | 用户 token |
-| `GET` | `/api/merchant-products/{product_id}` | 用户 token |
-| `POST` | `/api/merchant-products/{product_id}/redeem` | 用户 token |
-| `GET` | `/api/product-redemptions` | 用户 token |
-| `POST` | `/api/merchant/auth/test-login` | 无 |
-| `GET` | `/api/merchant/me` | 商户 token |
-| `GET` | `/api/merchant/redemptions` | 商户 token |
-| `GET` | `/api/merchant/redemptions/summary` | 商户 token |
