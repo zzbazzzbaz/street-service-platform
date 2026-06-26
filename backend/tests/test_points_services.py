@@ -26,6 +26,7 @@ class PointsServiceTests(TestCase):
         )
 
         self.assertEqual(record.amount, 10)
+        self.assertEqual(record.balance_after, 10)
         self.assertEqual(PointAccount.objects.get(member=self.member).balance, 10)
         self.assertEqual(PointRecord.objects.count(), 1)
 
@@ -41,6 +42,7 @@ class PointsServiceTests(TestCase):
         )
 
         self.assertEqual(record.amount, -12)
+        self.assertEqual(record.balance_after, 18)
         self.assertEqual(PointAccount.objects.get(member=self.member).balance, 18)
         self.assertEqual(PointRecord.objects.count(), 2)
 
@@ -76,6 +78,7 @@ class PointsServiceTests(TestCase):
         )
 
         self.assertEqual(adjustment.point_record.amount, 9)
+        self.assertEqual(adjustment.point_record.balance_after, 9)
         self.assertEqual(PointAccount.objects.get(member=self.member).balance, 9)
 
     def test_points_balance_and_records_api(self):
@@ -89,3 +92,5 @@ class PointsServiceTests(TestCase):
         self.assertEqual(balance_response.json()["data"]["balance"], 7)
         self.assertEqual(records_response.status_code, 200)
         self.assertEqual(records_response.json()["data"]["total"], 1)
+        item = records_response.json()["data"]["items"][0]
+        self.assertEqual(item["balance_after"], 7)

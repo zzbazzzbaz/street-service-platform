@@ -34,6 +34,7 @@ class PointRecord(models.Model):
     source_type = models.CharField("来源类型", max_length=32, choices=SourceType.choices)
     source_id = models.CharField("来源ID", max_length=64, blank=True)
     reason = models.CharField("原因", max_length=255)
+    balance_after = models.IntegerField("变动后余额", null=True, blank=True)
     operator = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,

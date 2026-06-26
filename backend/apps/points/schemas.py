@@ -14,6 +14,7 @@ class PointRecordOut(Schema):
     source_type: str
     source_id: str
     reason: str
+    balance_after: int | None = None
     created_at: datetime
 
 

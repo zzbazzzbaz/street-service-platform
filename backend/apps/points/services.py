@@ -38,6 +38,7 @@ def add_points(
         source_type=source_type,
         source_id=str(source_id or ""),
         reason=reason.strip(),
+        balance_after=account.balance,
         operator=operator,
     )
 
@@ -70,6 +71,7 @@ def deduct_points(
         source_type=source_type,
         source_id=str(source_id or ""),
         reason=reason.strip(),
+        balance_after=account.balance,
         operator=operator,
     )
 
@@ -96,5 +98,6 @@ def point_record_data(record: PointRecord) -> dict:
         "source_type": record.source_type,
         "source_id": record.source_id,
         "reason": record.reason,
+        "balance_after": record.balance_after,
         "created_at": record.created_at,
     }

@@ -19,12 +19,13 @@ class PointAccountAdmin(BackendManagerAdminMixin):
 
 @admin.register(PointRecord)
 class PointRecordAdmin(BackendManagerAdminMixin):
-    list_display = ("id", "member", "amount", "change_type", "source_type", "reason", "operator", "created_at")
+    list_display = ("id", "member", "amount", "balance_after", "change_type", "source_type", "reason", "operator", "created_at")
     list_filter = ("change_type", "source_type", "created_at")
     search_fields = ("member__openid", "member__nickname", "reason")
     readonly_fields = (
         "member",
         "amount",
+        "balance_after",
         "change_type",
         "source_type",
         "source_id",
