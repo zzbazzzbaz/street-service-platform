@@ -7,7 +7,11 @@ class LearningContentOut(Schema):
     id: int
     title: str
     cover: str
+    cover_url: str
     body: str
+    content_type: str
+    image_urls: list[str]
+    video_url: str
     points: int
     required_seconds: int
     is_active: bool

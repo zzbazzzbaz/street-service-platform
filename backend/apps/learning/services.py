@@ -13,11 +13,16 @@ from shared.exceptions import BusinessError
 def content_data(content: LearningContent, request=None) -> dict:
     from shared.media import file_url
 
+    cover_url = file_url(request, content.cover) if request is not None else (content.cover.url if content.cover else "")
     return {
         "id": content.id,
         "title": content.title,
-        "cover": file_url(request, content.cover) if request is not None else (content.cover.url if content.cover else ""),
+        "cover": cover_url,
+        "cover_url": cover_url,
         "body": content.body,
+        "content_type": content.content_type,
+        "image_urls": [],
+        "video_url": "",
         "points": content.points,
         "required_seconds": content.required_seconds,
         "is_active": content.is_active,

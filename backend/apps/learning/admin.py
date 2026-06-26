@@ -8,8 +8,8 @@ from shared.admin import BackendManagerAdminMixin, admin_image_preview
 
 @admin.register(LearningContent)
 class LearningContentAdmin(BackendManagerAdminMixin):
-    list_display = ("id", "title", "points", "required_seconds", "is_active", "created_at")
-    list_filter = ("is_active", "created_at")
+    list_display = ("id", "title", "content_type", "points", "required_seconds", "is_active", "created_at")
+    list_filter = ("content_type", "is_active", "created_at")
     search_fields = ("title",)
     readonly_fields = ("cover_preview", "created_at")
 

@@ -2,9 +2,15 @@ from django.db import models
 
 
 class LearningContent(models.Model):
+    class ContentType(models.TextChoices):
+        ARTICLE = "article", "图文文章"
+        IMAGE = "image", "图片内容"
+        VIDEO = "video", "视频内容"
+
     title = models.CharField("标题", max_length=120)
     cover = models.ImageField("封面", upload_to="learning/covers/", blank=True)
     body = models.TextField("正文", blank=True)
+    content_type = models.CharField("内容类型", max_length=20, choices=ContentType.choices, default=ContentType.ARTICLE)
     points = models.PositiveIntegerField("积分值", default=0)
     required_seconds = models.PositiveIntegerField("要求学习秒数", default=60)
     is_active = models.BooleanField("是否上架", default=True)
