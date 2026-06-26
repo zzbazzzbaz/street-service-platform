@@ -24,6 +24,14 @@ class MerchantLoginOut(Schema):
     merchant: MerchantOut
 
 
+class MerchantFixedCodeOut(Schema):
+    merchant_id: int
+    merchant_name: str
+    qr_payload: str
+    qrcode_url: str
+    mode: str
+
+
 class MerchantProductOut(Schema):
     id: int
     merchant_id: int

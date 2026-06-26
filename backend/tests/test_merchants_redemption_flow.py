@@ -93,6 +93,27 @@ class MerchantsRedemptionFlowTests(TestCase):
         self.assertEqual(summary_response.status_code, 200)
         self.assertEqual(summary_response.json()["data"]["redemption_count"], 1)
 
+    def test_merchant_fixed_code_returns_product_redemption_payload(self):
+        merchant_headers = auth_header("merchant", self.merchant.openid)
+
+        response = self.client.get("/api/merchant/fixed-code", **merchant_headers)
+
+        self.assertEqual(response.status_code, 200)
+        data = response.json()["data"]
+        self.assertEqual(data["merchant_id"], self.merchant.id)
+        self.assertEqual(data["merchant_name"], self.merchant.name)
+        self.assertEqual(data["mode"], "product_redemption")
+        self.assertIn(f"merchant_id={self.merchant.id}", data["qr_payload"])
+        self.assertIn("mode=product_redemption", data["qr_payload"])
+        self.assertEqual(data["qrcode_url"], "")
+
+    def test_member_token_cannot_read_merchant_fixed_code(self):
+        member_headers = auth_header("member", self.member.openid)
+
+        response = self.client.get("/api/merchant/fixed-code", **member_headers)
+
+        self.assertEqual(response.status_code, 401)
+
     def test_merchant_completes_own_pending_redemption_after_delivery(self):
         add_points(self.member, 50, source_type=PointRecord.SourceType.MANUAL, reason="测试加分")
         redemption = redeem_product(self.member, self.product)

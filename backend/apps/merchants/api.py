@@ -3,6 +3,7 @@ from django.shortcuts import get_object_or_404
 
 from apps.merchants.models import MerchantProduct, ProductRedemption
 from apps.merchants.schemas import (
+    MerchantFixedCodeOut,
     MerchantLoginOut,
     MerchantOut,
     MerchantProductOut,
@@ -12,7 +13,7 @@ from apps.merchants.schemas import (
     ProductRedemptionOut,
     ProductRedemptionsData,
 )
-from apps.merchants.services import complete_redemption, merchant_data, merchant_redemption_summary, product_data, redeem_product, redemption_data, test_login, wechat_login_placeholder
+from apps.merchants.services import complete_redemption, merchant_data, merchant_fixed_code_data, merchant_redemption_summary, product_data, redeem_product, redemption_data, test_login, wechat_login_placeholder
 from shared.api import ErrorResponse, SuccessResponse, error_response, success_response
 from shared.auth import TokenError
 from shared.exceptions import BusinessError
@@ -46,6 +47,17 @@ def merchant_me(request):
     except BusinessError as exc:
         return error_response(exc.code, exc.message, status=exc.status, errors=exc.errors)
     return success_response(merchant_data(merchant))
+
+
+@merchant_router.get("/fixed-code", response={200: SuccessResponse[MerchantFixedCodeOut], 401: ErrorResponse, 403: ErrorResponse})
+def merchant_fixed_code(request):
+    try:
+        merchant = authenticate_merchant(request)
+    except TokenError as exc:
+        return error_response(40001, str(exc), status=401)
+    except BusinessError as exc:
+        return error_response(exc.code, exc.message, status=exc.status, errors=exc.errors)
+    return success_response(merchant_fixed_code_data(merchant))
 
 
 @product_router.get("", response={200: SuccessResponse[MerchantProductsData], 401: ErrorResponse, 403: ErrorResponse})

@@ -64,6 +64,17 @@ def product_data(product: MerchantProduct, request=None) -> dict:
     }
 
 
+def merchant_fixed_code_data(merchant: Merchant) -> dict:
+    mode = "product_redemption"
+    return {
+        "merchant_id": merchant.id,
+        "merchant_name": merchant.name,
+        "qr_payload": f"street://merchant-products?merchant_id={merchant.id}&mode={mode}",
+        "qrcode_url": "",
+        "mode": mode,
+    }
+
+
 def redemption_data(redemption: ProductRedemption) -> dict:
     return {
         "id": redemption.id,
