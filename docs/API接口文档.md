@@ -57,6 +57,43 @@
 }
 ```
 
+## 2. 通用上传
+
+说明：本章节为一期前后端联调补充能力，后续章节编号保留历史编号。
+
+### 2.1 上传图片
+
+`POST /api/uploads/images`
+
+认证：用户 token 或商户 token。
+
+请求格式：`multipart/form-data`
+
+请求字段：
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `files` | file[] | 是 | 支持单图和多图，单图也使用 `files` |
+| `business_type` | string | 否 | `report`、`elder_service_feedback`、`merchant_product`、`learning_content`、`general` |
+| `related_id` | string | 否 | 已存在业务记录 ID；新增业务提交前可为空 |
+
+响应 `data.files[]`：
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `file_id` | string | 媒体相对路径 |
+| `url` | string | 可访问图片 URL |
+| `original_name` | string | 原文件名 |
+| `size` | integer | 文件大小，单位字节 |
+| `mime_type` | string | MIME 类型 |
+| `created_at` | datetime | 上传时间 |
+
+限制：
+
+- 允许 `image/jpeg`、`image/png`、`image/webp`。
+- 单张图片最大 `10MB`。
+- 一次最多上传 `10` 张。
+
 ## 2. 认证与账号
 
 ### 2.1 用户登录
@@ -178,7 +215,11 @@
 | `id` | integer | 内容 ID |
 | `title` | string | 标题 |
 | `cover` | string | 封面图片 URL |
+| `cover_url` | string | 封面图片 URL，兼容字段，与 `cover` 一致 |
 | `body` | string | 正文 |
+| `content_type` | string | 内容类型：`article`、`image`、`video` |
+| `image_urls` | array | 图片内容 URL 数组，MVP 暂返回空数组 |
+| `video_url` | string | 视频 URL，MVP 暂返回空字符串 |
 | `points` | integer | 完成后发放积分 |
 | `required_seconds` | integer | 要求学习秒数 |
 | `is_active` | boolean | 是否上架 |
@@ -211,7 +252,11 @@
 | `id` | integer | 内容 ID |
 | `title` | string | 标题 |
 | `cover` | string | 封面图片 URL |
+| `cover_url` | string | 封面图片 URL，兼容字段，与 `cover` 一致 |
 | `body` | string | 正文 |
+| `content_type` | string | 内容类型：`article`、`image`、`video` |
+| `image_urls` | array | 图片内容 URL 数组，MVP 暂返回空数组 |
+| `video_url` | string | 视频 URL，MVP 暂返回空字符串 |
 | `points` | integer | 完成后发放积分 |
 | `required_seconds` | integer | 要求学习秒数 |
 | `is_active` | boolean | 是否上架 |
@@ -473,7 +518,19 @@
 | --- | --- | --- |
 | `id` | integer | 报名 ID |
 | `activity_id` | integer | 活动 ID |
+| `title` | string | 活动标题 |
+| `body` | string | 活动正文 |
+| `location` | string | 活动地点 |
+| `start_time` | datetime | 开始时间 |
+| `end_time` | datetime | 结束时间 |
+| `points` | integer | 签到确认后发放积分 |
+| `signup_status` | string | `joined`；取消接口返回 `cancelled` |
 | `created_at` | datetime | 报名时间 |
+| `cancelled_at` | datetime/null | 取消时间；列表中通常为 `null` |
+| `checkin_status` | string | `not_checked`、`pending`、`confirmed`、`rejected` |
+| `checkin_at` | datetime/null | 签到提交时间 |
+| `point_status` | string | `not_granted`、`granted` |
+| `point_record_id` | integer/null | 关联积分流水 ID |
 
 业务规则：
 
@@ -536,7 +593,19 @@
 | --- | --- | --- |
 | `id` | integer | 报名 ID |
 | `activity_id` | integer | 活动 ID |
+| `title` | string | 活动标题 |
+| `body` | string | 活动正文 |
+| `location` | string | 活动地点 |
+| `start_time` | datetime | 开始时间 |
+| `end_time` | datetime | 结束时间 |
+| `points` | integer | 签到确认后发放积分 |
+| `signup_status` | string | `joined` |
 | `created_at` | datetime | 报名时间 |
+| `cancelled_at` | datetime/null | 取消时间；列表中通常为 `null` |
+| `checkin_status` | string | `not_checked`、`pending`、`confirmed`、`rejected` |
+| `checkin_at` | datetime/null | 签到提交时间 |
+| `point_status` | string | `not_granted`、`granted` |
+| `point_record_id` | integer/null | 关联积分流水 ID |
 
 响应 `data` 分页字段：
 
@@ -555,6 +624,32 @@
 - 后台确认签到：状态改为 `confirmed`，按活动积分发放积分并生成积分流水。
 - 后台驳回签到：状态改为 `rejected`，必须填写审核意见，不发积分。
 - 已审核签到不能再次审核。
+
+### 5.6 取消活动报名
+
+`DELETE /api/activities/{activity_id}/signup`
+
+认证：用户 token。
+
+路径参数：
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `activity_id` | integer | 活动 ID |
+
+响应 `data`：
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `activity_id` | integer | 活动 ID |
+| `signup_status` | string | 固定为 `cancelled` |
+| `cancelled_at` | datetime | 取消时间 |
+
+业务规则：
+
+- 只能取消自己的报名。
+- 已签到报名不能取消。
+- MVP 采用删除报名记录的方式，不保留取消历史列表。
 
 ## 6. 助老服务
 
@@ -734,6 +829,7 @@
 | `source_type` | string | 来源类型 |
 | `source_id` | string | 来源业务 ID |
 | `reason` | string | 变动原因 |
+| `balance_after` | integer/null | 本次变动后的余额；历史记录可能为空 |
 | `created_at` | datetime | 创建时间 |
 
 响应 `data` 分页字段：
@@ -846,11 +942,15 @@
 | --- | --- | --- |
 | `id` | integer | 兑换记录 ID |
 | `merchant_id` | integer | 商户 ID |
+| `merchant_name` | string | 商户名称 |
 | `product_id` | integer | 商品 ID |
 | `product_name` | string | 商品名称 |
 | `member_id` | integer | 用户 ID |
+| `member_name_masked` | string | 用户昵称脱敏 |
+| `member_phone_masked` | string | 用户手机号脱敏 |
 | `points_spent` | integer | 消耗积分 |
 | `status` | string | `pending` 或 `completed` |
+| `point_record_id` | integer/null | 关联积分流水 ID |
 | `created_at` | datetime | 创建时间 |
 
 业务规则：
@@ -881,11 +981,15 @@
 | --- | --- | --- |
 | `id` | integer | 兑换记录 ID |
 | `merchant_id` | integer | 商户 ID |
+| `merchant_name` | string | 商户名称 |
 | `product_id` | integer | 商品 ID |
 | `product_name` | string | 商品名称 |
 | `member_id` | integer | 用户 ID |
+| `member_name_masked` | string | 用户昵称脱敏 |
+| `member_phone_masked` | string | 用户手机号脱敏 |
 | `points_spent` | integer | 消耗积分 |
 | `status` | string | `pending` 或 `completed` |
+| `point_record_id` | integer/null | 关联积分流水 ID |
 | `created_at` | datetime | 创建时间 |
 
 响应 `data` 分页字段：
@@ -968,7 +1072,25 @@
 | `address` | string | 经营地址 |
 | `is_active` | boolean | 是否启用 |
 
-### 9.3 商户商品兑换记录
+### 9.3 商户商品兑换入口码
+
+`GET /api/merchant/fixed-code`
+
+认证：商户 token。
+
+说明：本接口只提供商品兑换模式下的商户码牌展示信息，不代表固定二维码积分抵扣能力。
+
+响应 `data`：
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `merchant_id` | integer | 商户 ID |
+| `merchant_name` | string | 商户名称 |
+| `qr_payload` | string | 二维码内容，包含 `merchant_id` 和 `mode=product_redemption` |
+| `qrcode_url` | string | 二维码图片 URL；MVP 可为空 |
+| `mode` | string | 固定为 `product_redemption` |
+
+### 9.4 商户商品兑换记录
 
 `GET /api/merchant/redemptions`
 
@@ -987,11 +1109,15 @@
 | --- | --- | --- |
 | `id` | integer | 兑换记录 ID |
 | `merchant_id` | integer | 商户 ID |
+| `merchant_name` | string | 商户名称 |
 | `product_id` | integer | 商品 ID |
 | `product_name` | string | 商品名称 |
 | `member_id` | integer | 用户 ID |
+| `member_name_masked` | string | 用户昵称脱敏 |
+| `member_phone_masked` | string | 用户手机号脱敏 |
 | `points_spent` | integer | 消耗积分 |
 | `status` | string | `pending` 或 `completed` |
+| `point_record_id` | integer/null | 关联积分流水 ID |
 | `created_at` | datetime | 创建时间 |
 
 响应 `data` 分页字段：
@@ -1003,7 +1129,7 @@
 | `page` | integer | 当前页码 |
 | `page_size` | integer | 每页数量 |
 
-### 9.4 商户确认商品交付
+### 9.5 商户确认商品交付
 
 `POST /api/merchant/redemptions/{redemption_id}/complete`
 
@@ -1023,11 +1149,15 @@
 | --- | --- | --- |
 | `id` | integer | 兑换记录 ID |
 | `merchant_id` | integer | 商户 ID |
+| `merchant_name` | string | 商户名称 |
 | `product_id` | integer | 商品 ID |
 | `product_name` | string | 商品名称 |
 | `member_id` | integer | 用户 ID |
+| `member_name_masked` | string | 用户昵称脱敏 |
+| `member_phone_masked` | string | 用户手机号脱敏 |
 | `points_spent` | integer | 消耗积分 |
 | `status` | string | 固定返回 `completed` |
+| `point_record_id` | integer/null | 关联积分流水 ID |
 | `created_at` | datetime | 创建时间 |
 
 业务规则：
@@ -1037,7 +1167,7 @@
 - 已完成的兑换记录不能重复确认。
 - 访问其他商户的兑换记录返回 `404`。
 
-### 9.5 商户月度兑换汇总
+### 9.6 商户月度兑换汇总
 
 `GET /api/merchant/redemptions/summary`
 
