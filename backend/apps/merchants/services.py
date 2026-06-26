@@ -25,6 +25,17 @@ def merchant_data(merchant: Merchant) -> dict:
     }
 
 
+def public_merchant_data(merchant: Merchant) -> dict:
+    return {
+        "id": merchant.id,
+        "name": merchant.name,
+        "contact_name": merchant.contact_name,
+        "phone": merchant.phone,
+        "address": merchant.address,
+        "is_active": merchant.is_active,
+    }
+
+
 def test_login(openid: str) -> dict:
     openid = openid.strip()
     if not openid:
@@ -61,17 +72,6 @@ def product_data(product: MerchantProduct, request=None) -> dict:
         "points_required": product.points_required,
         "is_active": product.is_active,
         "created_at": product.created_at,
-    }
-
-
-def merchant_fixed_code_data(merchant: Merchant) -> dict:
-    mode = "product_redemption"
-    return {
-        "merchant_id": merchant.id,
-        "merchant_name": merchant.name,
-        "qr_payload": f"street://merchant-products?merchant_id={merchant.id}&mode={mode}",
-        "qrcode_url": "",
-        "mode": mode,
     }
 
 

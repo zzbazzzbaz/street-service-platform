@@ -68,10 +68,20 @@ class MerchantsRedemptionFlowTests(TestCase):
 
     def test_member_product_api_and_merchant_redemption_api(self):
         add_points(self.member, 50, source_type=PointRecord.SourceType.MANUAL, reason="测试加分")
+        inactive_merchant = create_merchant(openid="inactive-merchant", name="停用商户", is_active=False)
+        other_product = MerchantProduct.objects.create(
+            merchant=self.other_merchant,
+            name="其他商户商品",
+            description="商品说明",
+            points_required=10,
+            is_active=True,
+        )
         member_headers = auth_header("member", self.member.openid)
         merchant_headers = auth_header("merchant", self.merchant.openid)
 
+        merchants_response = self.client.get("/api/merchants", **member_headers)
         list_response = self.client.get("/api/merchant-products", **member_headers)
+        filtered_list_response = self.client.get("/api/merchant-products", {"merchant_id": self.merchant.id}, **member_headers)
         detail_response = self.client.get(f"/api/merchant-products/{self.product.id}", **member_headers)
         redeem_response = self.client.post(
             f"/api/merchant-products/{self.product.id}/redeem",
@@ -87,7 +97,18 @@ class MerchantsRedemptionFlowTests(TestCase):
             **merchant_headers,
         )
 
+        self.assertEqual(merchants_response.status_code, 200)
+        merchant_items = merchants_response.json()["data"]["items"]
+        self.assertEqual([item["id"] for item in merchant_items], [self.other_merchant.id, self.merchant.id])
+        self.assertNotIn(inactive_merchant.id, [item["id"] for item in merchant_items])
+        self.assertNotIn("openid", merchant_items[0])
         self.assertEqual(list_response.status_code, 200)
+        self.assertEqual(list_response.json()["data"]["total"], 2)
+        self.assertEqual(filtered_list_response.status_code, 200)
+        filtered_items = filtered_list_response.json()["data"]["items"]
+        self.assertEqual([item["id"] for item in filtered_items], [self.product.id])
+        self.assertEqual(filtered_items[0]["merchant_id"], self.merchant.id)
+        self.assertNotEqual(filtered_items[0]["id"], other_product.id)
         self.assertEqual(detail_response.status_code, 200)
         self.assertEqual(redeem_response.status_code, 200)
         self.assertEqual(redemptions_response.status_code, 200)
@@ -102,26 +123,18 @@ class MerchantsRedemptionFlowTests(TestCase):
         self.assertEqual(summary_response.status_code, 200)
         self.assertEqual(summary_response.json()["data"]["redemption_count"], 1)
 
-    def test_merchant_fixed_code_returns_product_redemption_payload(self):
+    def test_merchant_fixed_code_endpoint_is_removed_from_mvp(self):
         merchant_headers = auth_header("merchant", self.merchant.openid)
 
         response = self.client.get("/api/merchant/fixed-code", **merchant_headers)
 
+        self.assertEqual(response.status_code, 404)
+
+    def test_openapi_does_not_publish_merchant_fixed_code(self):
+        response = self.client.get("/api/openapi.json")
+
         self.assertEqual(response.status_code, 200)
-        data = response.json()["data"]
-        self.assertEqual(data["merchant_id"], self.merchant.id)
-        self.assertEqual(data["merchant_name"], self.merchant.name)
-        self.assertEqual(data["mode"], "product_redemption")
-        self.assertIn(f"merchant_id={self.merchant.id}", data["qr_payload"])
-        self.assertIn("mode=product_redemption", data["qr_payload"])
-        self.assertEqual(data["qrcode_url"], "")
-
-    def test_member_token_cannot_read_merchant_fixed_code(self):
-        member_headers = auth_header("member", self.member.openid)
-
-        response = self.client.get("/api/merchant/fixed-code", **member_headers)
-
-        self.assertEqual(response.status_code, 401)
+        self.assertNotIn("/api/merchant/fixed-code", response.json()["paths"])
 
     def test_merchant_completes_own_pending_redemption_after_delivery(self):
         add_points(self.member, 50, source_type=PointRecord.SourceType.MANUAL, reason="测试加分")

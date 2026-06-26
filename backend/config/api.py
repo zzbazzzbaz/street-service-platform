@@ -7,7 +7,7 @@ from apps.core.api import router as uploads_router
 from apps.elder_services.api import router as elder_services_router
 from apps.learning.api import router as learning_router
 from apps.members.api import auth_router, router as members_router
-from apps.merchants.api import merchant_auth_router, merchant_router, product_router, redemption_router
+from apps.merchants.api import merchant_auth_router, merchant_router, product_router, public_merchant_router, redemption_router
 from apps.points.api import router as points_router
 from apps.reports.api import router as reports_router
 from shared.api import ErrorResponse, error_response
@@ -44,6 +44,7 @@ api.add_router("/reports", reports_router)
 api.add_router("/activities", activities_router)
 api.add_router("/elder-services", elder_services_router)
 api.add_router("/points", points_router)
+api.add_router("/merchants", public_merchant_router)
 api.add_router("/merchant-products", product_router)
 api.add_router("/product-redemptions", redemption_router)
 api.add_router("/merchant/auth", merchant_auth_router)

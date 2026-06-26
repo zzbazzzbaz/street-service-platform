@@ -1,9 +1,8 @@
 from ninja import Router
 from django.shortcuts import get_object_or_404
 
-from apps.merchants.models import MerchantProduct, ProductRedemption
+from apps.merchants.models import Merchant, MerchantProduct, ProductRedemption
 from apps.merchants.schemas import (
-    MerchantFixedCodeOut,
     MerchantLoginOut,
     MerchantOut,
     MerchantProductOut,
@@ -12,8 +11,9 @@ from apps.merchants.schemas import (
     MerchantWechatLoginIn,
     ProductRedemptionOut,
     ProductRedemptionsData,
+    PublicMerchantsData,
 )
-from apps.merchants.services import complete_redemption, merchant_data, merchant_fixed_code_data, merchant_redemption_summary, product_data, redeem_product, redemption_data, test_login, wechat_login_placeholder
+from apps.merchants.services import complete_redemption, merchant_data, merchant_redemption_summary, product_data, public_merchant_data, redeem_product, redemption_data, test_login, wechat_login_placeholder
 from shared.api import ErrorResponse, SuccessResponse, error_response, success_response
 from shared.auth import TokenError
 from shared.exceptions import BusinessError
@@ -23,6 +23,7 @@ from shared.services import authenticate_merchant
 
 
 merchant_auth_router = Router(tags=["商户认证"])
+public_merchant_router = Router(tags=["商户"])
 merchant_router = Router(tags=["商户"])
 product_router = Router(tags=["商品兑换"])
 redemption_router = Router(tags=["商品兑换记录"])
@@ -49,26 +50,30 @@ def merchant_me(request):
     return success_response(merchant_data(merchant))
 
 
-@merchant_router.get("/fixed-code", response={200: SuccessResponse[MerchantFixedCodeOut], 401: ErrorResponse, 403: ErrorResponse})
-def merchant_fixed_code(request):
-    try:
-        merchant = authenticate_merchant(request)
-    except TokenError as exc:
-        return error_response(40001, str(exc), status=401)
-    except BusinessError as exc:
-        return error_response(exc.code, exc.message, status=exc.status, errors=exc.errors)
-    return success_response(merchant_fixed_code_data(merchant))
-
-
-@product_router.get("", response={200: SuccessResponse[MerchantProductsData], 401: ErrorResponse, 403: ErrorResponse})
-def merchant_products(request, page: int = 1, page_size: int = 20):
+@public_merchant_router.get("", response={200: SuccessResponse[PublicMerchantsData], 401: ErrorResponse, 403: ErrorResponse})
+def public_merchants(request, page: int = 1, page_size: int = 20):
     try:
         authenticate_member(request)
     except TokenError as exc:
         return error_response(40001, str(exc), status=401)
     except BusinessError as exc:
         return error_response(exc.code, exc.message, status=exc.status, errors=exc.errors)
-    items, page_data = paginate_queryset(MerchantProduct.objects.filter(is_active=True).select_related("merchant"), page=page, page_size=page_size)
+    items, page_data = paginate_queryset(Merchant.objects.filter(is_active=True), page=page, page_size=page_size)
+    return success_response({"items": [public_merchant_data(item) for item in items], **page_data})
+
+
+@product_router.get("", response={200: SuccessResponse[MerchantProductsData], 401: ErrorResponse, 403: ErrorResponse})
+def merchant_products(request, page: int = 1, page_size: int = 20, merchant_id: int | None = None):
+    try:
+        authenticate_member(request)
+    except TokenError as exc:
+        return error_response(40001, str(exc), status=401)
+    except BusinessError as exc:
+        return error_response(exc.code, exc.message, status=exc.status, errors=exc.errors)
+    queryset = MerchantProduct.objects.filter(is_active=True, merchant__is_active=True).select_related("merchant")
+    if merchant_id is not None:
+        queryset = queryset.filter(merchant_id=merchant_id)
+    items, page_data = paginate_queryset(queryset, page=page, page_size=page_size)
     return success_response({"items": [product_data(item, request=request) for item in items], **page_data})
 
 

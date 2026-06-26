@@ -858,7 +858,42 @@
 
 ## 8. 商品兑换 用户端
 
-### 8.1 可兑换商品列表
+### 8.1 用户端商户列表
+
+`GET /api/merchants`
+
+认证：用户 token。
+
+查询参数：
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `page` | integer | 否 | 页码 |
+| `page_size` | integer | 否 | 每页数量 |
+
+响应 `data.items[]`：
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `id` | integer | 商户 ID |
+| `name` | string | 商户名称 |
+| `contact_name` | string | 联系人 |
+| `phone` | string | 手机号 |
+| `address` | string | 经营地址 |
+| `is_active` | boolean | 是否启用 |
+
+响应 `data` 分页字段：
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `items` | array | 商户列表 |
+| `total` | integer | 总数量 |
+| `page` | integer | 当前页码 |
+| `page_size` | integer | 每页数量 |
+
+说明：接口仅返回启用商户。用户点击商户后，通过 `merchant_id` 查询该商户商品列表。
+
+### 8.2 可兑换商品列表
 
 `GET /api/merchant-products`
 
@@ -870,6 +905,7 @@
 | --- | --- | --- | --- |
 | `page` | integer | 否 | 页码 |
 | `page_size` | integer | 否 | 每页数量 |
+| `merchant_id` | integer | 否 | 商户 ID；传入后只返回该商户商品 |
 
 响应 `data.items[]`：
 
@@ -894,9 +930,9 @@
 | `page` | integer | 当前页码 |
 | `page_size` | integer | 每页数量 |
 
-说明：接口仅返回上架商品。
+说明：接口仅返回启用商户下的上架商品。不传 `merchant_id` 时返回全部可兑换商品。
 
-### 8.2 可兑换商品详情
+### 8.3 可兑换商品详情
 
 `GET /api/merchant-products/{product_id}`
 
@@ -922,7 +958,7 @@
 | `is_active` | boolean | 是否上架 |
 | `created_at` | datetime | 创建时间 |
 
-### 8.3 使用积分兑换商品
+### 8.4 使用积分兑换商品
 
 `POST /api/merchant-products/{product_id}/redeem`
 
@@ -960,9 +996,9 @@
 - 用户积分余额必须足够。
 - 兑换成功后扣减积分并生成积分流水。
 - 兑换记录默认状态为 `pending`。
-- 一期不提供商户确认领取接口，`completed` 由 Django Admin 后台手动标记。
+- 商户向用户交付商品后，可通过商户端接口确认完成。
 
-### 8.4 我的商品兑换记录
+### 8.5 我的商品兑换记录
 
 `GET /api/product-redemptions`
 
@@ -1072,25 +1108,7 @@
 | `address` | string | 经营地址 |
 | `is_active` | boolean | 是否启用 |
 
-### 9.3 商户商品兑换入口码
-
-`GET /api/merchant/fixed-code`
-
-认证：商户 token。
-
-说明：本接口只提供商品兑换模式下的商户码牌展示信息，不代表固定二维码积分抵扣能力。
-
-响应 `data`：
-
-| 字段 | 类型 | 说明 |
-| --- | --- | --- |
-| `merchant_id` | integer | 商户 ID |
-| `merchant_name` | string | 商户名称 |
-| `qr_payload` | string | 二维码内容，包含 `merchant_id` 和 `mode=product_redemption` |
-| `qrcode_url` | string | 二维码图片 URL；MVP 可为空 |
-| `mode` | string | 固定为 `product_redemption` |
-
-### 9.4 商户商品兑换记录
+### 9.3 商户商品兑换记录
 
 `GET /api/merchant/redemptions`
 
@@ -1129,7 +1147,7 @@
 | `page` | integer | 当前页码 |
 | `page_size` | integer | 每页数量 |
 
-### 9.5 商户确认商品交付
+### 9.4 商户确认商品交付
 
 `POST /api/merchant/redemptions/{redemption_id}/complete`
 
@@ -1167,7 +1185,7 @@
 - 已完成的兑换记录不能重复确认。
 - 访问其他商户的兑换记录返回 `404`。
 
-### 9.6 商户月度兑换汇总
+### 9.5 商户月度兑换汇总
 
 `GET /api/merchant/redemptions/summary`
 
