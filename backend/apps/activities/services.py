@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from django.db import transaction
+from django.utils import timezone
 
 from apps.activities.models import Activity, ActivityCheckin, ActivitySignup
 from apps.members.models import Member
@@ -27,10 +28,28 @@ def activity_data(activity: Activity, *, include_checkin_secret: bool = False) -
 
 
 def signup_data(signup: ActivitySignup) -> dict:
+    activity = signup.activity
+    checkin = getattr(signup, "_member_checkin", None)
+    if checkin is None:
+        checkin = ActivityCheckin.objects.filter(member=signup.member, activity=activity).first()
+    checkin_status = checkin.status if checkin is not None else "not_checked"
+    point_record_id = checkin.point_record_id if checkin is not None else None
     return {
         "id": signup.id,
         "activity_id": signup.activity_id,
+        "title": activity.title,
+        "body": activity.body,
+        "location": activity.location,
+        "start_time": activity.start_time,
+        "end_time": activity.end_time,
+        "points": activity.points,
+        "signup_status": "joined",
         "created_at": signup.created_at,
+        "cancelled_at": None,
+        "checkin_status": checkin_status,
+        "checkin_at": checkin.created_at if checkin is not None else None,
+        "point_status": "granted" if point_record_id else "not_granted",
+        "point_record_id": point_record_id,
     }
 
 
@@ -51,6 +70,20 @@ def signup_activity(member: Member, activity: Activity) -> ActivitySignup:
     if ActivitySignup.objects.filter(member=member, activity=activity).exists():
         raise BusinessError("重复报名")
     return ActivitySignup.objects.create(member=member, activity=activity)
+
+
+def cancel_signup(member: Member, activity: Activity) -> dict:
+    signup = ActivitySignup.objects.filter(member=member, activity=activity).first()
+    if signup is None:
+        raise BusinessError("报名记录不存在", status=404, code=40400)
+    if ActivityCheckin.objects.filter(member=member, activity=activity).exists():
+        raise BusinessError("已签到的报名不能取消")
+    signup.delete()
+    return {
+        "activity_id": activity.id,
+        "signup_status": "cancelled",
+        "cancelled_at": timezone.now(),
+    }
 
 
 def checkin_activity(member: Member, activity: Activity, *, checkin_code: str) -> ActivityCheckin:

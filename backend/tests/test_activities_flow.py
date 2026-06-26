@@ -88,4 +88,35 @@ class ActivitiesFlowTests(TestCase):
         self.assertEqual(checkin_response.status_code, 200)
         self.assertEqual(my_signups_response.status_code, 200)
         self.assertEqual(my_signups_response.json()["data"]["total"], 1)
+        signup_item = my_signups_response.json()["data"]["items"][0]
+        self.assertEqual(signup_item["title"], self.activity.title)
+        self.assertEqual(signup_item["body"], self.activity.body)
+        self.assertEqual(signup_item["location"], self.activity.location)
+        self.assertEqual(signup_item["points"], self.activity.points)
+        self.assertEqual(signup_item["signup_status"], "joined")
+        self.assertEqual(signup_item["checkin_status"], "pending")
+        self.assertEqual(signup_item["point_status"], "not_granted")
+        self.assertIsNone(signup_item["point_record_id"])
         self.assertEqual(ActivityCheckin.objects.count(), 1)
+
+    def test_activity_api_cancel_signup_before_checkin(self):
+        signup_activity(self.member, self.activity)
+        headers = auth_header("member", self.member.openid)
+
+        response = self.client.delete(f"/api/activities/{self.activity.id}/signup", **headers)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["data"]["activity_id"], self.activity.id)
+        self.assertEqual(response.json()["data"]["signup_status"], "cancelled")
+        self.assertFalse(ActivitySignup.objects.filter(member=self.member, activity=self.activity).exists())
+
+    def test_activity_api_rejects_cancel_after_checkin(self):
+        signup_activity(self.member, self.activity)
+        checkin_activity(self.member, self.activity, checkin_code=self.activity.checkin_code)
+        headers = auth_header("member", self.member.openid)
+
+        response = self.client.delete(f"/api/activities/{self.activity.id}/signup", **headers)
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("已签到", response.json()["message"])
+        self.assertTrue(ActivitySignup.objects.filter(member=self.member, activity=self.activity).exists())

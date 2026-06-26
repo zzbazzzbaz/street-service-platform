@@ -24,7 +24,25 @@ class ActivitiesData(Schema):
 class ActivitySignupOut(Schema):
     id: int
     activity_id: int
+    title: str
+    body: str
+    location: str
+    start_time: datetime
+    end_time: datetime
+    points: int
+    signup_status: str
     created_at: datetime
+    cancelled_at: datetime | None = None
+    checkin_status: str
+    checkin_at: datetime | None = None
+    point_status: str
+    point_record_id: int | None = None
+
+
+class ActivitySignupCancelOut(Schema):
+    activity_id: int
+    signup_status: str
+    cancelled_at: datetime
 
 
 class ActivitySignupsData(Schema):

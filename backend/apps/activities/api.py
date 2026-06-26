@@ -1,9 +1,9 @@
 from django.shortcuts import get_object_or_404
 from ninja import Router
 
-from apps.activities.models import Activity
-from apps.activities.schemas import ActivitiesData, ActivityCheckinIn, ActivityCheckinOut, ActivityOut, ActivitySignupOut, ActivitySignupsData
-from apps.activities.services import activity_data, checkin_activity, checkin_data, signup_activity, signup_data
+from apps.activities.models import Activity, ActivityCheckin
+from apps.activities.schemas import ActivitiesData, ActivityCheckinIn, ActivityCheckinOut, ActivityOut, ActivitySignupCancelOut, ActivitySignupOut, ActivitySignupsData
+from apps.activities.services import activity_data, cancel_signup, checkin_activity, checkin_data, signup_activity, signup_data
 from shared.api import ErrorResponse, SuccessResponse, error_response, success_response
 from shared.auth import TokenError
 from shared.exceptions import BusinessError
@@ -34,7 +34,14 @@ def my_activity_signups(request, page: int = 1, page_size: int = 20):
         return error_response(40001, str(exc), status=401)
     except BusinessError as exc:
         return error_response(exc.code, exc.message, status=exc.status, errors=exc.errors)
-    items, page_data = paginate_queryset(member.activity_signups.select_related("activity"), page=page, page_size=page_size)
+    queryset = member.activity_signups.select_related("activity", "member")
+    items, page_data = paginate_queryset(queryset, page=page, page_size=page_size)
+    checkins = {
+        checkin.activity_id: checkin
+        for checkin in ActivityCheckin.objects.filter(member=member, activity_id__in=[item.activity_id for item in items])
+    }
+    for item in items:
+        item._member_checkin = checkins.get(item.activity_id)
     return success_response({"items": [signup_data(item) for item in items], **page_data})
 
 
@@ -63,6 +70,19 @@ def activity_signup(request, activity_id: int):
     return success_response(signup_data(signup))
 
 
+@router.delete("/{activity_id}/signup", response={200: SuccessResponse[ActivitySignupCancelOut], 400: ErrorResponse, 401: ErrorResponse, 403: ErrorResponse, 404: ErrorResponse})
+def activity_cancel_signup(request, activity_id: int):
+    try:
+        member = authenticate_member(request)
+        activity = get_object_or_404(Activity, pk=activity_id)
+        data = cancel_signup(member, activity)
+    except TokenError as exc:
+        return error_response(40001, str(exc), status=401)
+    except BusinessError as exc:
+        return error_response(exc.code, exc.message, status=exc.status, errors=exc.errors)
+    return success_response(data)
+
+
 @router.post("/{activity_id}/checkin", response={200: SuccessResponse[ActivityCheckinOut], 400: ErrorResponse, 401: ErrorResponse, 403: ErrorResponse, 404: ErrorResponse})
 def activity_checkin(request, activity_id: int, payload: ActivityCheckinIn):
     try:
@@ -74,4 +94,3 @@ def activity_checkin(request, activity_id: int, payload: ActivityCheckinIn):
     except BusinessError as exc:
         return error_response(exc.code, exc.message, status=exc.status, errors=exc.errors)
     return success_response(checkin_data(checkin))
-
