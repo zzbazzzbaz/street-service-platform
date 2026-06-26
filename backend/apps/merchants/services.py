@@ -75,22 +75,42 @@ def merchant_fixed_code_data(merchant: Merchant) -> dict:
     }
 
 
+def mask_name(value: str) -> str:
+    value = (value or "").strip()
+    if not value:
+        return ""
+    if len(value) == 1:
+        return "*"
+    return f"{value[0]}*"
+
+
+def mask_phone(value: str) -> str:
+    value = (value or "").strip()
+    if len(value) < 7:
+        return ""
+    return f"{value[:3]}****{value[-4:]}"
+
+
 def redemption_data(redemption: ProductRedemption) -> dict:
     return {
         "id": redemption.id,
         "merchant_id": redemption.merchant_id,
+        "merchant_name": redemption.merchant.name,
         "product_id": redemption.product_id,
         "product_name": redemption.product.name,
         "member_id": redemption.member_id,
+        "member_name_masked": mask_name(redemption.member.nickname),
+        "member_phone_masked": mask_phone(redemption.member.phone),
         "points_spent": redemption.points_spent,
         "status": redemption.status,
+        "point_record_id": redemption.point_record_id,
         "created_at": redemption.created_at,
     }
 
 
 @transaction.atomic
 def complete_redemption(redemption: ProductRedemption) -> ProductRedemption:
-    redemption = ProductRedemption.objects.select_for_update().select_related("merchant", "product").get(pk=redemption.pk)
+    redemption = ProductRedemption.objects.select_for_update().select_related("merchant", "member", "product", "point_record").get(pk=redemption.pk)
     if redemption.status == ProductRedemption.Status.COMPLETED:
         raise BusinessError("兑换记录已完成")
     redemption.status = ProductRedemption.Status.COMPLETED
@@ -122,6 +142,7 @@ def redeem_product(member: Member, product: MerchantProduct) -> ProductRedemptio
     )
     point_record.source_id = str(redemption.id)
     point_record.save(update_fields=["source_id"])
+    redemption = ProductRedemption.objects.select_related("merchant", "member", "product", "point_record").get(pk=redemption.pk)
     return redemption
 
 

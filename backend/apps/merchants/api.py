@@ -88,7 +88,7 @@ def merchant_product_detail(request, product_id: int):
 def redeem_merchant_product(request, product_id: int):
     try:
         member = authenticate_member(request)
-        product = get_object_or_404(MerchantProduct, pk=product_id)
+        product = get_object_or_404(MerchantProduct.objects.select_related("merchant"), pk=product_id)
         redemption = redeem_product(member, product)
     except TokenError as exc:
         return error_response(40001, str(exc), status=401)
@@ -105,7 +105,7 @@ def my_product_redemptions(request, page: int = 1, page_size: int = 20):
         return error_response(40001, str(exc), status=401)
     except BusinessError as exc:
         return error_response(exc.code, exc.message, status=exc.status, errors=exc.errors)
-    items, page_data = paginate_queryset(member.product_redemptions.select_related("merchant", "product"), page=page, page_size=page_size)
+    items, page_data = paginate_queryset(member.product_redemptions.select_related("merchant", "product", "member", "point_record"), page=page, page_size=page_size)
     return success_response({"items": [redemption_data(item) for item in items], **page_data})
 
 
@@ -117,7 +117,7 @@ def merchant_redemptions(request, page: int = 1, page_size: int = 20):
         return error_response(40001, str(exc), status=401)
     except BusinessError as exc:
         return error_response(exc.code, exc.message, status=exc.status, errors=exc.errors)
-    items, page_data = paginate_queryset(merchant.redemptions.select_related("member", "product"), page=page, page_size=page_size)
+    items, page_data = paginate_queryset(merchant.redemptions.select_related("merchant", "member", "product", "point_record"), page=page, page_size=page_size)
     return success_response({"items": [redemption_data(item) for item in items], **page_data})
 
 
@@ -125,7 +125,7 @@ def merchant_redemptions(request, page: int = 1, page_size: int = 20):
 def merchant_complete_redemption(request, redemption_id: int):
     try:
         merchant = authenticate_merchant(request)
-        redemption = get_object_or_404(ProductRedemption.objects.select_related("merchant", "product"), pk=redemption_id, merchant=merchant)
+        redemption = get_object_or_404(ProductRedemption.objects.select_related("merchant", "member", "product", "point_record"), pk=redemption_id, merchant=merchant)
         return success_response(redemption_data(complete_redemption(redemption)))
     except TokenError as exc:
         return error_response(40001, str(exc), status=401)

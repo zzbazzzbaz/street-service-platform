@@ -30,6 +30,8 @@ class MerchantsRedemptionFlowTests(TestCase):
         self.assertEqual(redemption.points_spent, 20)
         self.assertEqual(PointAccount.objects.get(member=self.member).balance, 10)
         self.assertEqual(PointRecord.objects.filter(source_type=PointRecord.SourceType.PRODUCT_REDEMPTION).count(), 1)
+        self.assertIsNotNone(redemption.point_record_id)
+        self.assertEqual(redemption.point_record.balance_after, 10)
 
     def test_redeem_product_rejects_inactive_and_insufficient_balance(self):
         inactive = MerchantProduct.objects.create(
@@ -90,6 +92,13 @@ class MerchantsRedemptionFlowTests(TestCase):
         self.assertEqual(redeem_response.status_code, 200)
         self.assertEqual(redemptions_response.status_code, 200)
         self.assertEqual(merchant_records_response.status_code, 200)
+        member_redemption = redemptions_response.json()["data"]["items"][0]
+        merchant_redemption = merchant_records_response.json()["data"]["items"][0]
+        for item in (member_redemption, merchant_redemption):
+            self.assertEqual(item["merchant_name"], self.merchant.name)
+            self.assertEqual(item["member_name_masked"], "测*")
+            self.assertEqual(item["member_phone_masked"], "138****0000")
+            self.assertIsNotNone(item["point_record_id"])
         self.assertEqual(summary_response.status_code, 200)
         self.assertEqual(summary_response.json()["data"]["redemption_count"], 1)
 

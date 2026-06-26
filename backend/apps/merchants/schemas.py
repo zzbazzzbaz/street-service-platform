@@ -54,11 +54,15 @@ class MerchantProductsData(Schema):
 class ProductRedemptionOut(Schema):
     id: int
     merchant_id: int
+    merchant_name: str
     product_id: int
     product_name: str
     member_id: int
+    member_name_masked: str
+    member_phone_masked: str
     points_spent: int
     status: str
+    point_record_id: int | None = None
     created_at: datetime
 
 
