@@ -9,6 +9,8 @@ class LearningContent(models.Model):
 
     title = models.CharField("标题", max_length=120)
     cover = models.ImageField("封面", upload_to="learning/covers/", blank=True)
+    image = models.ImageField("内容图片", upload_to="learning/images/", blank=True)
+    video = models.FileField("视频文件", upload_to="learning/videos/", blank=True)
     body = models.TextField("正文", blank=True)
     content_type = models.CharField("内容类型", max_length=20, choices=ContentType.choices, default=ContentType.ARTICLE)
     points = models.PositiveIntegerField("积分值", default=0)

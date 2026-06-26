@@ -14,6 +14,8 @@ def content_data(content: LearningContent, request=None) -> dict:
     from shared.media import file_url
 
     cover_url = file_url(request, content.cover) if request is not None else (content.cover.url if content.cover else "")
+    image_url = file_url(request, content.image) if request is not None else (content.image.url if content.image else "")
+    video_url = file_url(request, content.video) if request is not None else (content.video.url if content.video else "")
     return {
         "id": content.id,
         "title": content.title,
@@ -21,8 +23,8 @@ def content_data(content: LearningContent, request=None) -> dict:
         "cover_url": cover_url,
         "body": content.body,
         "content_type": content.content_type,
-        "image_urls": [],
-        "video_url": "",
+        "image_urls": [image_url] if image_url else [],
+        "video_url": video_url,
         "points": content.points,
         "required_seconds": content.required_seconds,
         "is_active": content.is_active,

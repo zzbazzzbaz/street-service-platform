@@ -44,6 +44,15 @@ class AdminFeaturesTests(SimpleTestCase):
 
         self.assertNotIsInstance(form_field.widget, TinyMCE)
 
+    def test_learning_content_media_fields_use_file_upload_widgets(self):
+        model_admin = LearningContentAdmin(LearningContent, self.site)
+
+        image_field = model_admin.formfield_for_dbfield(LearningContent._meta.get_field("image"), request=None)
+        video_field = model_admin.formfield_for_dbfield(LearningContent._meta.get_field("video"), request=None)
+
+        self.assertEqual(image_field.widget.input_type, "file")
+        self.assertEqual(video_field.widget.input_type, "file")
+
     def test_admin_image_preview_outputs_thumbnail_and_original_link(self):
         cases = [
             (ReportAdmin(Report, self.site), Report(image="reports/example.jpg"), "image_preview"),
@@ -53,6 +62,7 @@ class AdminFeaturesTests(SimpleTestCase):
                 "image_preview",
             ),
             (LearningContentAdmin(LearningContent, self.site), LearningContent(cover="learning/covers/example.jpg"), "cover_preview"),
+            (LearningContentAdmin(LearningContent, self.site), LearningContent(image="learning/images/example.jpg"), "image_preview"),
             (
                 MerchantProductAdmin(MerchantProduct, self.site),
                 MerchantProduct(image="merchant-products/example.jpg"),
@@ -78,6 +88,14 @@ class AdminFeaturesTests(SimpleTestCase):
         html = str(model_admin.image_preview(Report()))
 
         self.assertEqual(html, "暂无图片")
+
+    def test_learning_content_video_preview_outputs_file_link(self):
+        model_admin = LearningContentAdmin(LearningContent, self.site)
+
+        html = str(model_admin.video_preview(LearningContent(video="learning/videos/example.mp4")))
+
+        self.assertIn("target=\"_blank\"", html)
+        self.assertIn("打开视频", html)
 
 
 @override_settings(MEDIA_ROOT="/tmp/street-service-test-media")

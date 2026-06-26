@@ -177,8 +177,8 @@
 | --- | --- | --- |
 | `content_type` | string | 内容类型：`article`、`image`、`video` |
 | `cover_url` | string | 封面 URL，当前与 `cover` 一致 |
-| `image_urls` | string[] | 图片 URL 数组；MVP 暂返回空数组 |
-| `video_url` | string | 视频 URL；MVP 暂返回空字符串 |
+| `image_urls` | string[] | 图片 URL 数组；后台上传内容图片后返回单元素数组，未上传返回空数组 |
+| `video_url` | string | 视频 URL；后台上传视频后返回文件 URL，未上传返回空字符串 |
 
 响应项示例：
 
@@ -189,9 +189,11 @@
   "cover": "https://example.com/media/learning/covers/a.jpg",
   "cover_url": "https://example.com/media/learning/covers/a.jpg",
   "body": "正文",
-  "content_type": "article",
-  "image_urls": [],
-  "video_url": "",
+  "content_type": "video",
+  "image_urls": [
+    "https://example.com/media/learning/images/a.jpg"
+  ],
+  "video_url": "https://example.com/media/learning/videos/a.mp4",
   "points": 5,
   "required_seconds": 60,
   "is_active": true

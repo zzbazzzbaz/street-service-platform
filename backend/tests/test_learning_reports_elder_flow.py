@@ -48,6 +48,9 @@ class LearningReportsElderFlowTests(TestCase):
         content = LearningContent.objects.create(
             title="安全学习",
             body="正文",
+            content_type=LearningContent.ContentType.VIDEO,
+            image="learning/images/safety.jpg",
+            video="learning/videos/safety.mp4",
             points=3,
             required_seconds=10,
             is_active=True,
@@ -66,16 +69,18 @@ class LearningReportsElderFlowTests(TestCase):
         self.assertEqual(list_response.status_code, 200)
         self.assertEqual(list_response.json()["data"]["total"], 1)
         list_item = list_response.json()["data"]["items"][0]
-        self.assertEqual(list_item["content_type"], "article")
+        self.assertEqual(list_item["content_type"], "video")
         self.assertEqual(list_item["cover_url"], list_item["cover"])
-        self.assertEqual(list_item["image_urls"], [])
-        self.assertEqual(list_item["video_url"], "")
+        self.assertEqual(len(list_item["image_urls"]), 1)
+        self.assertIn("/media/learning/images/safety.jpg", list_item["image_urls"][0])
+        self.assertIn("/media/learning/videos/safety.mp4", list_item["video_url"])
         self.assertEqual(detail_response.status_code, 200)
         detail_data = detail_response.json()["data"]
-        self.assertEqual(detail_data["content_type"], "article")
+        self.assertEqual(detail_data["content_type"], "video")
         self.assertEqual(detail_data["cover_url"], detail_data["cover"])
-        self.assertEqual(detail_data["image_urls"], [])
-        self.assertEqual(detail_data["video_url"], "")
+        self.assertEqual(len(detail_data["image_urls"]), 1)
+        self.assertIn("/media/learning/images/safety.jpg", detail_data["image_urls"][0])
+        self.assertIn("/media/learning/videos/safety.mp4", detail_data["video_url"])
         self.assertEqual(complete_response.status_code, 200)
         self.assertTrue(LearningRecord.objects.get(member=self.member, content=content).is_completed)
 

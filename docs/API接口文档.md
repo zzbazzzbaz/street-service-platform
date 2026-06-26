@@ -218,8 +218,8 @@
 | `cover_url` | string | 封面图片 URL，兼容字段，与 `cover` 一致 |
 | `body` | string | 正文 |
 | `content_type` | string | 内容类型：`article`、`image`、`video` |
-| `image_urls` | array | 图片内容 URL 数组，MVP 暂返回空数组 |
-| `video_url` | string | 视频 URL，MVP 暂返回空字符串 |
+| `image_urls` | array | 图片内容 URL 数组；后台上传内容图片后返回单元素数组，未上传返回空数组 |
+| `video_url` | string | 视频 URL；后台上传视频后返回文件 URL，未上传返回空字符串 |
 | `points` | integer | 完成后发放积分 |
 | `required_seconds` | integer | 要求学习秒数 |
 | `is_active` | boolean | 是否上架 |
@@ -255,8 +255,8 @@
 | `cover_url` | string | 封面图片 URL，兼容字段，与 `cover` 一致 |
 | `body` | string | 正文 |
 | `content_type` | string | 内容类型：`article`、`image`、`video` |
-| `image_urls` | array | 图片内容 URL 数组，MVP 暂返回空数组 |
-| `video_url` | string | 视频 URL，MVP 暂返回空字符串 |
+| `image_urls` | array | 图片内容 URL 数组；后台上传内容图片后返回单元素数组，未上传返回空数组 |
+| `video_url` | string | 视频 URL；后台上传视频后返回文件 URL，未上传返回空字符串 |
 | `points` | integer | 完成后发放积分 |
 | `required_seconds` | integer | 要求学习秒数 |
 | `is_active` | boolean | 是否上架 |
