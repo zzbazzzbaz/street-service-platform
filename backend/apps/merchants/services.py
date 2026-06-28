@@ -1,14 +1,14 @@
 from __future__ import annotations
 
+from decimal import Decimal, ROUND_HALF_UP
+
 from django.conf import settings
 from django.db import transaction
-from django.db.models import Count, Sum
-from django.utils import timezone
 
 from apps.members.models import Member
-from apps.merchants.models import Merchant, MerchantProduct, ProductRedemption
-from apps.points.models import PointRecord
-from apps.points.services import deduct_points
+from apps.merchants.models import Merchant
+from apps.points.models import PointExchangeRule, PointRecord
+from apps.points.services import deduct_points, get_or_create_account
 from shared.auth import issue_token
 from shared.exceptions import BusinessError
 
@@ -59,22 +59,6 @@ def wechat_login_placeholder(code: str) -> dict:
     raise BusinessError("商户微信登录暂未接入", code=40000)
 
 
-def product_data(product: MerchantProduct, request=None) -> dict:
-    from shared.media import file_url
-
-    return {
-        "id": product.id,
-        "merchant_id": product.merchant_id,
-        "merchant_name": product.merchant.name,
-        "name": product.name,
-        "image": file_url(request, product.image) if request is not None else (product.image.url if product.image else ""),
-        "description": product.description,
-        "points_required": product.points_required,
-        "is_active": product.is_active,
-        "created_at": product.created_at,
-    }
-
-
 def mask_name(value: str) -> str:
     value = (value or "").strip()
     if not value:
@@ -91,79 +75,89 @@ def mask_phone(value: str) -> str:
     return f"{value[:3]}****{value[-4:]}"
 
 
-def redemption_data(redemption: ProductRedemption) -> dict:
+def active_exchange_rule() -> PointExchangeRule:
+    rule = PointExchangeRule.objects.filter(is_active=True).order_by("-updated_at", "-id").first()
+    if rule is None:
+        raise BusinessError("积分兑换比例未配置")
+    if rule.points_per_yuan <= 0:
+        raise BusinessError("积分兑换比例必须大于 0")
+    return rule
+
+
+def fixed_code_data(merchant: Merchant) -> dict:
     return {
-        "id": redemption.id,
-        "merchant_id": redemption.merchant_id,
-        "merchant_name": redemption.merchant.name,
-        "product_id": redemption.product_id,
-        "product_name": redemption.product.name,
-        "member_id": redemption.member_id,
-        "member_name_masked": mask_name(redemption.member.nickname),
-        "member_phone_masked": mask_phone(redemption.member.phone),
-        "points_spent": redemption.points_spent,
-        "status": redemption.status,
-        "point_record_id": redemption.point_record_id,
-        "created_at": redemption.created_at,
+        "merchant_id": merchant.id,
+        "merchant_name": merchant.name,
+        "code_content": f"street-service://merchant-pay?merchant_id={merchant.id}",
     }
 
 
-@transaction.atomic
-def complete_redemption(redemption: ProductRedemption) -> ProductRedemption:
-    redemption = ProductRedemption.objects.select_for_update().select_related("merchant", "member", "product", "point_record").get(pk=redemption.pk)
-    if redemption.status == ProductRedemption.Status.COMPLETED:
-        raise BusinessError("兑换记录已完成")
-    redemption.status = ProductRedemption.Status.COMPLETED
-    redemption.save(update_fields=["status"])
-    return redemption
+def merchant_payment_info(member: Member, merchant: Merchant) -> dict:
+    if not merchant.is_active:
+        raise BusinessError("商户已停用", status=403, code=40003)
+    rule = active_exchange_rule()
+    account = get_or_create_account(member)
+    return {
+        "merchant_id": merchant.id,
+        "merchant_name": merchant.name,
+        "phone": merchant.phone,
+        "address": merchant.address,
+        "points_per_yuan": rule.points_per_yuan,
+        "balance": account.balance,
+    }
+
+
+def payment_record_data(record: PointRecord) -> dict:
+    return {
+        "id": record.id,
+        "merchant_id": record.merchant_id,
+        "merchant_name": record.merchant.name if record.merchant_id else "",
+        "points": abs(record.amount),
+        "yuan_amount": f"{record.yuan_amount:.2f}" if record.yuan_amount is not None else "0.00",
+        "balance_after": record.balance_after,
+        "request_no": record.request_no,
+        "created_at": record.created_at,
+    }
+
+
+def merchant_point_record_data(record: PointRecord) -> dict:
+    data = payment_record_data(record)
+    data.update(
+        {
+            "member_id": record.member_id,
+            "member_name_masked": mask_name(record.member.nickname),
+            "member_phone_masked": mask_phone(record.member.phone),
+        }
+    )
+    return data
 
 
 @transaction.atomic
-def redeem_product(member: Member, product: MerchantProduct) -> ProductRedemption:
-    product = MerchantProduct.objects.select_for_update().select_related("merchant").get(pk=product.pk)
-    if not product.is_active:
-        raise BusinessError("商品已下架")
-    if product.points_required <= 0:
-        raise BusinessError("商品兑换积分必须大于 0")
-    point_record = deduct_points(
+def pay_merchant_with_points(member: Member, merchant: Merchant, points: int, *, request_no: str = "") -> PointRecord:
+    points = int(points)
+    request_no = request_no.strip()
+    merchant = Merchant.objects.select_for_update().get(pk=merchant.pk)
+    if not merchant.is_active:
+        raise BusinessError("商户已停用", status=403, code=40003)
+    if points <= 0:
+        raise BusinessError("积分值必须大于 0")
+    if request_no:
+        existing = (
+            PointRecord.objects.select_related("merchant", "member")
+            .filter(merchant=merchant, request_no=request_no, source_type=PointRecord.SourceType.MERCHANT_PAYMENT)
+            .first()
+        )
+        if existing is not None:
+            return existing
+    rule = active_exchange_rule()
+    yuan_amount = (Decimal(points) / Decimal(rule.points_per_yuan)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    return deduct_points(
         member,
-        product.points_required,
-        source_type=PointRecord.SourceType.PRODUCT_REDEMPTION,
-        source_id=f"product-{product.id}",
-        reason=f"兑换商品：{product.name}",
+        points,
+        source_type=PointRecord.SourceType.MERCHANT_PAYMENT,
+        source_id=str(merchant.id),
+        reason=f"商户积分支付：{merchant.name}",
+        merchant=merchant,
+        yuan_amount=yuan_amount,
+        request_no=request_no,
     )
-    redemption = ProductRedemption.objects.create(
-        merchant=product.merchant,
-        product=product,
-        member=member,
-        points_spent=product.points_required,
-        status=ProductRedemption.Status.PENDING,
-        point_record=point_record,
-    )
-    point_record.source_id = str(redemption.id)
-    point_record.save(update_fields=["source_id"])
-    redemption = ProductRedemption.objects.select_related("merchant", "member", "product", "point_record").get(pk=redemption.pk)
-    return redemption
-
-
-def merchant_redemption_summary(merchant: Merchant, *, month: str) -> dict:
-    try:
-        start = timezone.datetime.strptime(month, "%Y-%m").replace(tzinfo=timezone.get_current_timezone())
-    except ValueError as exc:
-        raise BusinessError("月份格式必须为 YYYY-MM") from exc
-    if start.month == 12:
-        end = start.replace(year=start.year + 1, month=1)
-    else:
-        end = start.replace(month=start.month + 1)
-    queryset = ProductRedemption.objects.filter(merchant=merchant, created_at__gte=start, created_at__lt=end)
-    aggregate = queryset.aggregate(
-        redemption_count=Count("id"),
-        product_count=Count("product", distinct=True),
-        points_total=Sum("points_spent"),
-    )
-    return {
-        "month": month,
-        "redemption_count": aggregate["redemption_count"] or 0,
-        "product_count": aggregate["product_count"] or 0,
-        "points_total": aggregate["points_total"] or 0,
-    }

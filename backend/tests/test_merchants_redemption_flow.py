@@ -1,170 +1,123 @@
+from decimal import Decimal
+
 from django.test import TestCase
 
-from apps.merchants.models import MerchantProduct, ProductRedemption
-from apps.merchants.services import merchant_redemption_summary, redeem_product
-from apps.points.models import PointAccount, PointRecord
+from apps.merchants.services import fixed_code_data, merchant_payment_info, merchant_point_record_data, pay_merchant_with_points
+from apps.points.models import PointAccount, PointExchangeRule, PointRecord
 from apps.points.services import add_points
 from shared.exceptions import BusinessError
 from tests.helpers import auth_header, create_member, create_merchant
 
 
-class MerchantsRedemptionFlowTests(TestCase):
+class MerchantPointPaymentFlowTests(TestCase):
     def setUp(self):
         self.member = create_member()
         self.merchant = create_merchant()
         self.other_merchant = create_merchant(openid="other-merchant", name="其他商户")
-        self.product = MerchantProduct.objects.create(
-            merchant=self.merchant,
-            name="兑换商品",
-            description="商品说明",
-            points_required=20,
-            is_active=True,
-        )
+        PointExchangeRule.objects.create(points_per_yuan=100, is_active=True)
 
-    def test_redeem_product_deducts_points_and_creates_pending_record(self):
-        add_points(self.member, 30, source_type=PointRecord.SourceType.MANUAL, reason="测试加分")
+    def test_pay_merchant_with_points_deducts_balance_and_records_metadata(self):
+        add_points(self.member, 150, source_type=PointRecord.SourceType.MANUAL, reason="测试加分")
 
-        redemption = redeem_product(self.member, self.product)
+        record = pay_merchant_with_points(self.member, self.merchant, 100, request_no="pay-001")
 
-        self.assertEqual(redemption.status, ProductRedemption.Status.PENDING)
-        self.assertEqual(redemption.points_spent, 20)
-        self.assertEqual(PointAccount.objects.get(member=self.member).balance, 10)
-        self.assertEqual(PointRecord.objects.filter(source_type=PointRecord.SourceType.PRODUCT_REDEMPTION).count(), 1)
-        self.assertIsNotNone(redemption.point_record_id)
-        self.assertEqual(redemption.point_record.balance_after, 10)
+        self.assertEqual(PointAccount.objects.get(member=self.member).balance, 50)
+        self.assertEqual(record.source_type, PointRecord.SourceType.MERCHANT_PAYMENT)
+        self.assertEqual(record.merchant, self.merchant)
+        self.assertEqual(record.amount, -100)
+        self.assertEqual(record.yuan_amount, Decimal("1.00"))
+        self.assertEqual(record.request_no, "pay-001")
+        self.assertEqual(record.balance_after, 50)
 
-    def test_redeem_product_rejects_inactive_and_insufficient_balance(self):
-        inactive = MerchantProduct.objects.create(
-            merchant=self.merchant,
-            name="下架商品",
-            description="商品说明",
-            points_required=1,
-            is_active=False,
-        )
+    def test_pay_merchant_rejects_inactive_insufficient_and_missing_rule(self):
+        inactive = create_merchant(openid="inactive-merchant", name="停用商户", is_active=False)
+        add_points(self.member, 50, source_type=PointRecord.SourceType.MANUAL, reason="测试加分")
 
-        with self.assertRaisesRegex(BusinessError, "下架"):
-            redeem_product(self.member, inactive)
+        with self.assertRaisesRegex(BusinessError, "商户已停用"):
+            pay_merchant_with_points(self.member, inactive, 10)
 
         with self.assertRaisesRegex(BusinessError, "积分余额不足"):
-            redeem_product(self.member, self.product)
+            pay_merchant_with_points(self.member, self.merchant, 100)
 
-    def test_merchant_summary_only_counts_own_records(self):
-        add_points(self.member, 100, source_type=PointRecord.SourceType.MANUAL, reason="测试加分")
-        redeem_product(self.member, self.product)
-        other_product = MerchantProduct.objects.create(
-            merchant=self.other_merchant,
-            name="其他商品",
-            description="商品说明",
-            points_required=10,
-            is_active=True,
-        )
-        redeem_product(self.member, other_product)
+        PointExchangeRule.objects.update(is_active=False)
+        with self.assertRaisesRegex(BusinessError, "积分兑换比例未配置"):
+            pay_merchant_with_points(self.member, self.merchant, 10)
 
-        summary = merchant_redemption_summary(self.merchant, month=ProductRedemption.objects.first().created_at.strftime("%Y-%m"))
+    def test_pay_merchant_request_no_is_idempotent(self):
+        add_points(self.member, 200, source_type=PointRecord.SourceType.MANUAL, reason="测试加分")
 
-        self.assertEqual(summary["redemption_count"], 1)
-        self.assertEqual(summary["product_count"], 1)
-        self.assertEqual(summary["points_total"], 20)
+        first = pay_merchant_with_points(self.member, self.merchant, 100, request_no="same-req")
+        second = pay_merchant_with_points(self.member, self.merchant, 100, request_no="same-req")
 
-    def test_member_product_api_and_merchant_redemption_api(self):
-        add_points(self.member, 50, source_type=PointRecord.SourceType.MANUAL, reason="测试加分")
-        inactive_merchant = create_merchant(openid="inactive-merchant", name="停用商户", is_active=False)
-        other_product = MerchantProduct.objects.create(
-            merchant=self.other_merchant,
-            name="其他商户商品",
-            description="商品说明",
-            points_required=10,
-            is_active=True,
-        )
+        self.assertEqual(first.id, second.id)
+        self.assertEqual(PointAccount.objects.get(member=self.member).balance, 100)
+        self.assertEqual(PointRecord.objects.filter(source_type=PointRecord.SourceType.MERCHANT_PAYMENT).count(), 1)
+
+    def test_fixed_code_and_payment_info_services(self):
+        add_points(self.member, 120, source_type=PointRecord.SourceType.MANUAL, reason="测试加分")
+
+        fixed_code = fixed_code_data(self.merchant)
+        payment_info = merchant_payment_info(self.member, self.merchant)
+
+        self.assertEqual(fixed_code["merchant_id"], self.merchant.id)
+        self.assertIn(str(self.merchant.id), fixed_code["code_content"])
+        self.assertEqual(payment_info["merchant_id"], self.merchant.id)
+        self.assertEqual(payment_info["points_per_yuan"], 100)
+        self.assertEqual(payment_info["balance"], 120)
+
+    def test_merchant_payment_api_flow(self):
+        add_points(self.member, 150, source_type=PointRecord.SourceType.MANUAL, reason="测试加分")
         member_headers = auth_header("member", self.member.openid)
         merchant_headers = auth_header("merchant", self.merchant.openid)
 
-        merchants_response = self.client.get("/api/merchants", **member_headers)
-        list_response = self.client.get("/api/merchant-products", **member_headers)
-        filtered_list_response = self.client.get("/api/merchant-products", {"merchant_id": self.merchant.id}, **member_headers)
-        detail_response = self.client.get(f"/api/merchant-products/{self.product.id}", **member_headers)
-        redeem_response = self.client.post(
-            f"/api/merchant-products/{self.product.id}/redeem",
-            {},
+        info_response = self.client.get(f"/api/merchants/{self.merchant.id}/payment-info", **member_headers)
+        pay_response = self.client.post(
+            f"/api/merchants/{self.merchant.id}/point-payments",
+            {"points": 100, "request_no": "api-pay-001"},
             content_type="application/json",
             **member_headers,
         )
-        redemptions_response = self.client.get("/api/product-redemptions", **member_headers)
-        merchant_records_response = self.client.get("/api/merchant/redemptions", **merchant_headers)
-        summary_response = self.client.get(
-            "/api/merchant/redemptions/summary",
-            {"month": ProductRedemption.objects.first().created_at.strftime("%Y-%m")},
-            **merchant_headers,
-        )
+        fixed_code_response = self.client.get("/api/merchant/fixed-code", **merchant_headers)
+        records_response = self.client.get("/api/merchant/point-records", **merchant_headers)
 
-        self.assertEqual(merchants_response.status_code, 200)
-        merchant_items = merchants_response.json()["data"]["items"]
-        self.assertEqual([item["id"] for item in merchant_items], [self.other_merchant.id, self.merchant.id])
-        self.assertNotIn(inactive_merchant.id, [item["id"] for item in merchant_items])
-        self.assertNotIn("openid", merchant_items[0])
-        self.assertEqual(list_response.status_code, 200)
-        self.assertEqual(list_response.json()["data"]["total"], 2)
-        self.assertEqual(filtered_list_response.status_code, 200)
-        filtered_items = filtered_list_response.json()["data"]["items"]
-        self.assertEqual([item["id"] for item in filtered_items], [self.product.id])
-        self.assertEqual(filtered_items[0]["merchant_id"], self.merchant.id)
-        self.assertNotEqual(filtered_items[0]["id"], other_product.id)
-        self.assertEqual(detail_response.status_code, 200)
-        self.assertEqual(redeem_response.status_code, 200)
-        self.assertEqual(redemptions_response.status_code, 200)
-        self.assertEqual(merchant_records_response.status_code, 200)
-        member_redemption = redemptions_response.json()["data"]["items"][0]
-        merchant_redemption = merchant_records_response.json()["data"]["items"][0]
-        for item in (member_redemption, merchant_redemption):
-            self.assertEqual(item["merchant_name"], self.merchant.name)
-            self.assertEqual(item["member_name_masked"], "测*")
-            self.assertEqual(item["member_phone_masked"], "138****0000")
-            self.assertIsNotNone(item["point_record_id"])
-        self.assertEqual(summary_response.status_code, 200)
-        self.assertEqual(summary_response.json()["data"]["redemption_count"], 1)
+        self.assertEqual(info_response.status_code, 200)
+        self.assertEqual(info_response.json()["data"]["points_per_yuan"], 100)
+        self.assertEqual(pay_response.status_code, 200)
+        self.assertEqual(pay_response.json()["data"]["points"], 100)
+        self.assertEqual(pay_response.json()["data"]["yuan_amount"], "1.00")
+        self.assertEqual(pay_response.json()["data"]["balance_after"], 50)
+        self.assertEqual(fixed_code_response.status_code, 200)
+        self.assertIn(str(self.merchant.id), fixed_code_response.json()["data"]["code_content"])
+        self.assertEqual(records_response.status_code, 200)
+        self.assertEqual(records_response.json()["data"]["total"], 1)
+        self.assertEqual(records_response.json()["data"]["items"][0]["merchant_id"], self.merchant.id)
 
-    def test_merchant_fixed_code_endpoint_is_removed_from_mvp(self):
-        merchant_headers = auth_header("merchant", self.merchant.openid)
+    def test_merchant_point_records_only_include_current_merchant(self):
+        add_points(self.member, 300, source_type=PointRecord.SourceType.MANUAL, reason="测试加分")
+        own_record = pay_merchant_with_points(self.member, self.merchant, 100, request_no="own")
+        pay_merchant_with_points(self.member, self.other_merchant, 100, request_no="other")
 
-        response = self.client.get("/api/merchant/fixed-code", **merchant_headers)
+        headers = auth_header("merchant", self.merchant.openid)
+        response = self.client.get("/api/merchant/point-records", **headers)
 
-        self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.status_code, 200)
+        items = response.json()["data"]["items"]
+        self.assertEqual([item["id"] for item in items], [own_record.id])
 
-    def test_openapi_does_not_publish_merchant_fixed_code(self):
+    def test_openapi_does_not_publish_old_mall_routes(self):
         response = self.client.get("/api/openapi.json")
 
         self.assertEqual(response.status_code, 200)
-        self.assertNotIn("/api/merchant/fixed-code", response.json()["paths"])
+        paths = response.json()["paths"]
+        self.assertNotIn("/api/merchant-products", paths)
+        self.assertNotIn("/api/product-redemptions", paths)
+        self.assertNotIn("/api/merchant/redemptions", paths)
 
-    def test_merchant_completes_own_pending_redemption_after_delivery(self):
-        add_points(self.member, 50, source_type=PointRecord.SourceType.MANUAL, reason="测试加分")
-        redemption = redeem_product(self.member, self.product)
-        merchant_headers = auth_header("merchant", self.merchant.openid)
+    def test_merchant_point_record_data_masks_member(self):
+        add_points(self.member, 150, source_type=PointRecord.SourceType.MANUAL, reason="测试加分")
+        record = pay_merchant_with_points(self.member, self.merchant, 100, request_no="mask")
 
-        response = self.client.post(
-            f"/api/merchant/redemptions/{redemption.id}/complete",
-            {},
-            content_type="application/json",
-            **merchant_headers,
-        )
+        data = merchant_point_record_data(record)
 
-        redemption.refresh_from_db()
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json()["data"]["status"], ProductRedemption.Status.COMPLETED)
-        self.assertEqual(redemption.status, ProductRedemption.Status.COMPLETED)
-
-    def test_merchant_cannot_complete_other_merchant_redemption(self):
-        add_points(self.member, 50, source_type=PointRecord.SourceType.MANUAL, reason="测试加分")
-        redemption = redeem_product(self.member, self.product)
-        other_merchant_headers = auth_header("merchant", self.other_merchant.openid)
-
-        response = self.client.post(
-            f"/api/merchant/redemptions/{redemption.id}/complete",
-            {},
-            content_type="application/json",
-            **other_merchant_headers,
-        )
-
-        redemption.refresh_from_db()
-        self.assertEqual(response.status_code, 404)
-        self.assertEqual(redemption.status, ProductRedemption.Status.PENDING)
+        self.assertEqual(data["member_name_masked"], "测*")
+        self.assertEqual(data["member_phone_masked"], "138****0000")

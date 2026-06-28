@@ -1,5 +1,6 @@
-from ninja import Schema
 from datetime import datetime
+
+from ninja import Schema
 
 
 class MerchantWechatLoginIn(Schema):
@@ -40,49 +41,53 @@ class PublicMerchantsData(Schema):
     page_size: int
 
 
-class MerchantProductOut(Schema):
+class MerchantFixedCodeOut(Schema):
+    merchant_id: int
+    merchant_name: str
+    code_content: str
+
+
+class MerchantPaymentInfoOut(Schema):
+    merchant_id: int
+    merchant_name: str
+    phone: str
+    address: str
+    points_per_yuan: int
+    balance: int
+
+
+class MerchantPointPaymentIn(Schema):
+    points: int
+    request_no: str = ""
+
+
+class MerchantPointPaymentOut(Schema):
     id: int
     merchant_id: int
     merchant_name: str
-    name: str
-    image: str
-    description: str
-    points_required: int
-    is_active: bool
+    points: int
+    yuan_amount: str
+    balance_after: int
+    request_no: str
     created_at: datetime
 
 
-class MerchantProductsData(Schema):
-    items: list[MerchantProductOut]
-    total: int
-    page: int
-    page_size: int
-
-
-class ProductRedemptionOut(Schema):
+class MerchantPointRecordOut(Schema):
     id: int
     merchant_id: int
     merchant_name: str
-    product_id: int
-    product_name: str
     member_id: int
     member_name_masked: str
     member_phone_masked: str
-    points_spent: int
-    status: str
-    point_record_id: int | None = None
+    points: int
+    yuan_amount: str
+    balance_after: int | None = None
+    request_no: str
     created_at: datetime
 
 
-class ProductRedemptionsData(Schema):
-    items: list[ProductRedemptionOut]
+class MerchantPointRecordsData(Schema):
+    items: list[MerchantPointRecordOut]
     total: int
     page: int
     page_size: int
-
-
-class MerchantRedemptionSummaryOut(Schema):
-    month: str
-    redemption_count: int
-    product_count: int
-    points_total: int

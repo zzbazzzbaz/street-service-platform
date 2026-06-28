@@ -10,8 +10,6 @@ from apps.elder_services.admin import ElderServiceFeedbackAdmin
 from apps.elder_services.models import ElderServiceFeedback
 from apps.learning.admin import LearningContentAdmin
 from apps.learning.models import LearningContent
-from apps.merchants.admin import MerchantProductAdmin
-from apps.merchants.models import MerchantProduct
 from apps.reports.admin import ReportAdmin
 from apps.reports.models import Report
 
@@ -63,11 +61,6 @@ class AdminFeaturesTests(SimpleTestCase):
             ),
             (LearningContentAdmin(LearningContent, self.site), LearningContent(cover="learning/covers/example.jpg"), "cover_preview"),
             (LearningContentAdmin(LearningContent, self.site), LearningContent(image="learning/images/example.jpg"), "image_preview"),
-            (
-                MerchantProductAdmin(MerchantProduct, self.site),
-                MerchantProduct(image="merchant-products/example.jpg"),
-                "image_preview",
-            ),
             (
                 ActivityAdmin(Activity, self.site),
                 Activity(checkin_qr_image="activities/qrcodes/example.png"),
