@@ -7,8 +7,8 @@ from apps.activities.models import Activity, ActivityCheckin, ActivitySignup
 from apps.elder_services.models import ElderServiceFeedback, ElderServiceTask
 from apps.learning.models import LearningContent, LearningRecord
 from apps.members.models import Member
-from apps.merchants.models import Merchant, MerchantProduct, ProductRedemption
-from apps.points.models import PointAccount, PointRecord
+from apps.merchants.models import Merchant
+from apps.points.models import PointAccount, PointExchangeRule, PointRecord
 from apps.reports.models import Report
 
 
@@ -29,9 +29,15 @@ class SeedMvpCommandTests(TestCase):
         self.assertTrue(ElderServiceTask.objects.filter(status=ElderServiceTask.Status.PUBLISHED).exists())
         self.assertTrue(ElderServiceFeedback.objects.filter(member=member, status=ElderServiceFeedback.Status.PENDING).exists())
         self.assertTrue(Report.objects.filter(member=member, status=Report.Status.PENDING).exists())
-        self.assertGreaterEqual(MerchantProduct.objects.filter(merchant=merchant, is_active=True).count(), 2)
-        self.assertTrue(ProductRedemption.objects.filter(merchant=merchant, member=member, status=ProductRedemption.Status.PENDING).exists())
-        self.assertTrue(ProductRedemption.objects.filter(merchant=merchant, member=member, status=ProductRedemption.Status.COMPLETED).exists())
+        self.assertTrue(PointExchangeRule.objects.filter(points_per_yuan=100, is_active=True).exists())
+        self.assertTrue(
+            PointRecord.objects.filter(
+                member=member,
+                source_type=PointRecord.SourceType.MERCHANT_PAYMENT,
+                merchant=merchant,
+                amount=-100,
+            ).exists()
+        )
         self.assertGreater(PointAccount.objects.get(member=member).balance, 0)
         self.assertTrue(PointRecord.objects.filter(member=member).exists())
 
@@ -48,8 +54,8 @@ class SeedMvpCommandTests(TestCase):
             "tasks": ElderServiceTask.objects.count(),
             "feedbacks": ElderServiceFeedback.objects.count(),
             "reports": Report.objects.count(),
-            "products": MerchantProduct.objects.count(),
-            "redemptions": ProductRedemption.objects.count(),
+            "exchange_rules": PointExchangeRule.objects.count(),
+            "merchant_payments": PointRecord.objects.filter(source_type=PointRecord.SourceType.MERCHANT_PAYMENT).count(),
             "point_records": PointRecord.objects.count(),
         }
         first_balance = PointAccount.objects.get(member__openid="test-openid").balance
@@ -67,8 +73,8 @@ class SeedMvpCommandTests(TestCase):
             "tasks": ElderServiceTask.objects.count(),
             "feedbacks": ElderServiceFeedback.objects.count(),
             "reports": Report.objects.count(),
-            "products": MerchantProduct.objects.count(),
-            "redemptions": ProductRedemption.objects.count(),
+            "exchange_rules": PointExchangeRule.objects.count(),
+            "merchant_payments": PointRecord.objects.filter(source_type=PointRecord.SourceType.MERCHANT_PAYMENT).count(),
             "point_records": PointRecord.objects.count(),
         }
         second_balance = PointAccount.objects.get(member__openid="test-openid").balance

@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand
 from django.utils import timezone
@@ -6,12 +8,23 @@ from apps.activities.models import Activity, ActivityCheckin, ActivitySignup
 from apps.elder_services.models import ElderServiceFeedback, ElderServiceTask
 from apps.learning.models import LearningContent, LearningRecord
 from apps.members.models import Member
-from apps.merchants.models import Merchant, MerchantProduct, ProductRedemption
-from apps.points.models import PointAccount, PointRecord
+from apps.merchants.models import Merchant
+from apps.points.models import PointAccount, PointExchangeRule, PointRecord
 from apps.reports.models import Report
 
 
-def ensure_point_record(member, *, amount: int, source_type: str, source_id: str, reason: str, operator=None):
+def ensure_point_record(
+    member,
+    *,
+    amount: int,
+    source_type: str,
+    source_id: str,
+    reason: str,
+    operator=None,
+    merchant=None,
+    yuan_amount=None,
+    request_no: str = "",
+):
     change_type = PointRecord.ChangeType.INCOME if amount > 0 else PointRecord.ChangeType.EXPENSE
     record, _ = PointRecord.objects.update_or_create(
         member=member,
@@ -22,6 +35,9 @@ def ensure_point_record(member, *, amount: int, source_type: str, source_id: str
             "change_type": change_type,
             "reason": reason,
             "operator": operator,
+            "merchant": merchant,
+            "yuan_amount": yuan_amount,
+            "request_no": request_no,
         },
     )
     return record
@@ -72,6 +88,10 @@ class Command(BaseCommand):
             openid="bakery-merchant-openid",
             defaults={"name": "暖心面包房", "contact_name": "李店长", "phone": "13900000002", "address": "邻里中心一层", "is_active": True},
         )
+        PointExchangeRule.objects.update_or_create(
+            id=1,
+            defaults={"points_per_yuan": 100, "is_active": True},
+        )
 
         safety_content, _ = LearningContent.objects.update_or_create(
             title="街道服务安全学习",
@@ -83,7 +103,7 @@ class Command(BaseCommand):
         )
         LearningContent.objects.update_or_create(
             title="积分兑换规则说明",
-            defaults={"body": "介绍积分获取、商品兑换、商户交付核销和记录查询流程。", "points": 0, "required_seconds": 30, "is_active": True},
+            defaults={"body": "介绍积分获取、扫码支付、商户积分流水查询和兑换比例规则。", "points": 0, "required_seconds": 30, "is_active": True},
         )
 
         learning_record = ensure_point_record(
@@ -154,22 +174,6 @@ class Command(BaseCommand):
             },
         )
 
-        rice_product, _ = MerchantProduct.objects.update_or_create(
-            merchant=merchant,
-            name="便民大米 1kg",
-            defaults={"description": "社区便民兑换商品，适合作为积分商城基础兑换样例。", "points_required": 20, "is_active": True},
-        )
-        soap_product, _ = MerchantProduct.objects.update_or_create(
-            merchant=merchant,
-            name="家用香皂套装",
-            defaults={"description": "商户交付后可在商户端确认核销。", "points_required": 15, "is_active": True},
-        )
-        MerchantProduct.objects.update_or_create(
-            merchant=other_merchant,
-            name="暖心面包券",
-            defaults={"description": "用于验证商户端只能看到本商户兑换记录。", "points_required": 12, "is_active": True},
-        )
-
         ensure_point_record(
             member,
             amount=120,
@@ -179,37 +183,16 @@ class Command(BaseCommand):
             operator=admin,
         )
 
-        pending_redemption, _ = ProductRedemption.objects.update_or_create(
-            merchant=merchant,
-            product=rice_product,
-            member=member,
-            defaults={"points_spent": rice_product.points_required, "status": ProductRedemption.Status.PENDING},
-        )
-        pending_record = ensure_point_record(
+        ensure_point_record(
             member,
-            amount=-rice_product.points_required,
-            source_type=PointRecord.SourceType.PRODUCT_REDEMPTION,
-            source_id=f"seed-redemption-{pending_redemption.id}",
-            reason=f"兑换商品：{rice_product.name}",
-        )
-        pending_redemption.point_record = pending_record
-        pending_redemption.save(update_fields=["point_record"])
-
-        completed_redemption, _ = ProductRedemption.objects.update_or_create(
+            amount=-100,
+            source_type=PointRecord.SourceType.MERCHANT_PAYMENT,
+            source_id=str(merchant.id),
+            reason=f"商户积分支付：{merchant.name}",
             merchant=merchant,
-            product=soap_product,
-            member=member,
-            defaults={"points_spent": soap_product.points_required, "status": ProductRedemption.Status.COMPLETED},
+            yuan_amount=Decimal("1.00"),
+            request_no="seed-merchant-payment",
         )
-        completed_record = ensure_point_record(
-            member,
-            amount=-soap_product.points_required,
-            source_type=PointRecord.SourceType.PRODUCT_REDEMPTION,
-            source_id=f"seed-redemption-{completed_redemption.id}",
-            reason=f"兑换商品：{soap_product.name}",
-        )
-        completed_redemption.point_record = completed_record
-        completed_redemption.save(update_fields=["point_record"])
 
         refresh_point_account(member)
 
