@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from decimal import Decimal
+
 from django.db import transaction
 
 from apps.members.models import Member
@@ -28,7 +30,8 @@ def add_points(
     if not reason.strip():
         raise BusinessError("积分变动原因不能为空")
 
-    account = get_or_create_account(member)
+    get_or_create_account(member)
+    account = PointAccount.objects.select_for_update().get(member=member)
     account.balance += amount
     account.save(update_fields=["balance"])
     return PointRecord.objects.create(
@@ -52,11 +55,15 @@ def deduct_points(
     source_id: str = "",
     reason: str,
     operator=None,
+    merchant=None,
+    yuan_amount: Decimal | None = None,
+    request_no: str = "",
 ) -> PointRecord:
     amount = int(amount)
     if amount <= 0:
         raise BusinessError("积分值必须大于 0")
-    account = get_or_create_account(member)
+    get_or_create_account(member)
+    account = PointAccount.objects.select_for_update().get(member=member)
     if not reason.strip():
         raise BusinessError("积分变动原因不能为空")
     if account.balance < amount:
@@ -73,6 +80,9 @@ def deduct_points(
         reason=reason.strip(),
         balance_after=account.balance,
         operator=operator,
+        merchant=merchant,
+        yuan_amount=yuan_amount,
+        request_no=request_no.strip(),
     )
 
 
@@ -99,5 +109,9 @@ def point_record_data(record: PointRecord) -> dict:
         "source_id": record.source_id,
         "reason": record.reason,
         "balance_after": record.balance_after,
+        "merchant_id": record.merchant_id,
+        "merchant_name": record.merchant.name if record.merchant_id else "",
+        "yuan_amount": f"{record.yuan_amount:.2f}" if record.yuan_amount is not None else None,
+        "request_no": record.request_no,
         "created_at": record.created_at,
     }

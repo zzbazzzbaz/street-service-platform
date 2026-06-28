@@ -27,7 +27,7 @@ class SimpleUISettingsTests(SimpleTestCase):
         self.assertFalse(config["dynamic"])
         self.assertEqual(
             [menu["name"] for menu in config["menus"]],
-            ["用户管理", "学习宣传", "随手上报", "活动管理", "助老服务", "积分商城", "后台账号"],
+            ["用户管理", "学习宣传", "随手上报", "活动管理", "助老服务", "积分与商户", "后台账号"],
         )
 
         model_urls = {
@@ -50,9 +50,8 @@ class SimpleUISettingsTests(SimpleTestCase):
                 "/admin/points/pointaccount/",
                 "/admin/points/pointrecord/",
                 "/admin/points/manualpointadjustment/",
+                "/admin/points/pointexchangerule/",
                 "/admin/merchants/merchant/",
-                "/admin/merchants/merchantproduct/",
-                "/admin/merchants/productredemption/",
                 "/admin/accounts/user/",
             },
         )

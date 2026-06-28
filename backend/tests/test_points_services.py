@@ -1,7 +1,10 @@
+from decimal import Decimal
+
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 
-from apps.points.models import ManualPointAdjustment, PointAccount, PointRecord
+from apps.merchants.models import Merchant
+from apps.points.models import ManualPointAdjustment, PointAccount, PointExchangeRule, PointRecord
 from apps.points.services import add_points, deduct_points, manual_add_points
 from shared.exceptions import BusinessError
 from tests.helpers import auth_header, create_member
@@ -36,9 +39,9 @@ class PointsServiceTests(TestCase):
         record = deduct_points(
             self.member,
             12,
-            source_type=PointRecord.SourceType.PRODUCT_REDEMPTION,
-            source_id="redemption-1",
-            reason="兑换商品",
+            source_type=PointRecord.SourceType.MERCHANT_PAYMENT,
+            source_id="merchant-1",
+            reason="商户积分支付",
         )
 
         self.assertEqual(record.amount, -12)
@@ -51,8 +54,8 @@ class PointsServiceTests(TestCase):
             deduct_points(
                 self.member,
                 1,
-                source_type=PointRecord.SourceType.PRODUCT_REDEMPTION,
-                reason="兑换商品",
+                source_type=PointRecord.SourceType.MERCHANT_PAYMENT,
+                reason="商户积分支付",
             )
 
         self.assertFalse(PointAccount.objects.filter(member=self.member).exists())
@@ -94,3 +97,50 @@ class PointsServiceTests(TestCase):
         self.assertEqual(records_response.json()["data"]["total"], 1)
         item = records_response.json()["data"]["items"][0]
         self.assertEqual(item["balance_after"], 7)
+
+    def test_point_record_api_exposes_merchant_payment_metadata(self):
+        merchant = Merchant.objects.create(openid="merchant-pay-openid", name="便民超市")
+        record = PointRecord.objects.create(
+            member=self.member,
+            amount=-100,
+            change_type=PointRecord.ChangeType.EXPENSE,
+            source_type=PointRecord.SourceType.MERCHANT_PAYMENT,
+            source_id=str(merchant.id),
+            reason="商户积分支付：便民超市",
+            balance_after=20,
+            merchant=merchant,
+            yuan_amount=Decimal("1.00"),
+            request_no="req-001",
+        )
+
+        headers = auth_header("member", self.member.openid)
+        response = self.client.get("/api/points/records", **headers)
+
+        self.assertEqual(response.status_code, 200)
+        item = response.json()["data"]["items"][0]
+        self.assertEqual(item["id"], record.id)
+        self.assertEqual(item["source_type"], PointRecord.SourceType.MERCHANT_PAYMENT)
+        self.assertEqual(item["merchant_id"], merchant.id)
+        self.assertEqual(item["merchant_name"], merchant.name)
+        self.assertEqual(item["yuan_amount"], "1.00")
+        self.assertEqual(item["request_no"], "req-001")
+
+    def test_deduct_points_accepts_merchant_payment_metadata(self):
+        merchant = Merchant.objects.create(openid="merchant-meta-openid", name="便民超市")
+        add_points(self.member, 150, source_type=PointRecord.SourceType.MANUAL, reason="初始积分")
+
+        record = deduct_points(
+            self.member,
+            100,
+            source_type=PointRecord.SourceType.MERCHANT_PAYMENT,
+            source_id=str(merchant.id),
+            reason="商户积分支付：便民超市",
+            merchant=merchant,
+            yuan_amount=Decimal("1.00"),
+            request_no="req-meta",
+        )
+
+        self.assertEqual(record.merchant, merchant)
+        self.assertEqual(record.yuan_amount, Decimal("1.00"))
+        self.assertEqual(record.request_no, "req-meta")
+        self.assertEqual(record.balance_after, 50)

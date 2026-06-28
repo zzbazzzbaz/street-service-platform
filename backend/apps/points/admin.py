@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from apps.points.models import ManualPointAdjustment, PointAccount, PointRecord
+from apps.points.models import ManualPointAdjustment, PointAccount, PointExchangeRule, PointRecord
 from shared.admin import BackendManagerAdminMixin
 
 
@@ -19,9 +19,9 @@ class PointAccountAdmin(BackendManagerAdminMixin):
 
 @admin.register(PointRecord)
 class PointRecordAdmin(BackendManagerAdminMixin):
-    list_display = ("id", "member", "amount", "balance_after", "change_type", "source_type", "reason", "operator", "created_at")
-    list_filter = ("change_type", "source_type", "created_at")
-    search_fields = ("member__openid", "member__nickname", "reason")
+    list_display = ("id", "member", "amount", "balance_after", "change_type", "source_type", "merchant", "yuan_amount", "reason", "operator", "created_at")
+    list_filter = ("change_type", "source_type", "merchant", "created_at")
+    search_fields = ("member__openid", "member__nickname", "merchant__name", "reason", "request_no")
     readonly_fields = (
         "member",
         "amount",
@@ -29,6 +29,9 @@ class PointRecordAdmin(BackendManagerAdminMixin):
         "change_type",
         "source_type",
         "source_id",
+        "merchant",
+        "yuan_amount",
+        "request_no",
         "reason",
         "operator",
         "created_at",
@@ -60,3 +63,10 @@ class ManualPointAdjustmentAdmin(BackendManagerAdminMixin):
         if obj is not None:
             return False
         return super().has_change_permission(request, obj)
+
+
+@admin.register(PointExchangeRule)
+class PointExchangeRuleAdmin(BackendManagerAdminMixin):
+    list_display = ("id", "points_per_yuan", "is_active", "updated_at")
+    list_filter = ("is_active",)
+    readonly_fields = ("updated_at",)

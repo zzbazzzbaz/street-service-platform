@@ -201,16 +201,15 @@ SIMPLEUI_CONFIG = {
             ],
         },
         {
-            "name": "积分商城",
+            "name": "积分与商户",
             "icon": "fas fa-store",
             "permission": "points.view_pointaccount",
             "models": [
                 {"name": "积分账户", "icon": "fas fa-wallet", "url": "/admin/points/pointaccount/", "permission": "points.view_pointaccount"},
                 {"name": "积分流水", "icon": "fas fa-receipt", "url": "/admin/points/pointrecord/", "permission": "points.view_pointrecord"},
                 {"name": "人工调分", "icon": "fas fa-pen-to-square", "url": "/admin/points/manualpointadjustment/", "permission": "points.view_manualpointadjustment"},
+                {"name": "积分兑换比例", "icon": "fas fa-scale-balanced", "url": "/admin/points/pointexchangerule/", "permission": "points.view_pointexchangerule"},
                 {"name": "商户", "icon": "fas fa-shop", "url": "/admin/merchants/merchant/", "permission": "merchants.view_merchant"},
-                {"name": "商品", "icon": "fas fa-box", "url": "/admin/merchants/merchantproduct/", "permission": "merchants.view_merchantproduct"},
-                {"name": "兑换记录", "icon": "fas fa-gift", "url": "/admin/merchants/productredemption/", "permission": "merchants.view_productredemption"},
             ],
         },
         {

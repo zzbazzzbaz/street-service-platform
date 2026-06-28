@@ -26,7 +26,7 @@ class PointRecord(models.Model):
         ACTIVITY = "activity", "活动"
         ELDER_SERVICE = "elder_service", "老人服务"
         MANUAL = "manual", "人工"
-        PRODUCT_REDEMPTION = "product_redemption", "商品兑换"
+        MERCHANT_PAYMENT = "merchant_payment", "商户积分支付"
 
     member = models.ForeignKey("members.Member", on_delete=models.CASCADE, related_name="point_records", verbose_name="用户")
     amount = models.IntegerField("积分变动值")
@@ -35,6 +35,16 @@ class PointRecord(models.Model):
     source_id = models.CharField("来源ID", max_length=64, blank=True)
     reason = models.CharField("原因", max_length=255)
     balance_after = models.IntegerField("变动后余额", null=True, blank=True)
+    merchant = models.ForeignKey(
+        "merchants.Merchant",
+        on_delete=models.SET_NULL,
+        related_name="point_records",
+        null=True,
+        blank=True,
+        verbose_name="商户",
+    )
+    yuan_amount = models.DecimalField("折算金额", max_digits=10, decimal_places=2, null=True, blank=True)
+    request_no = models.CharField("请求号", max_length=64, blank=True)
     operator = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
@@ -50,9 +60,31 @@ class PointRecord(models.Model):
         verbose_name = "积分流水"
         verbose_name_plural = "积分流水"
         ordering = ("-created_at", "-id")
+        constraints = [
+            models.UniqueConstraint(
+                fields=["merchant", "request_no"],
+                condition=~models.Q(request_no=""),
+                name="uniq_merchant_point_record_request_no",
+            ),
+        ]
 
     def __str__(self) -> str:
         return f"{self.member} {self.amount}"
+
+
+class PointExchangeRule(models.Model):
+    points_per_yuan = models.PositiveIntegerField("每元所需积分")
+    is_active = models.BooleanField("是否启用", default=True)
+    updated_at = models.DateTimeField("更新时间", auto_now=True)
+
+    class Meta:
+        db_table = "points_exchange_rule"
+        verbose_name = "积分兑换比例"
+        verbose_name_plural = "积分兑换比例"
+        ordering = ("-updated_at", "-id")
+
+    def __str__(self) -> str:
+        return f"{self.points_per_yuan} 积分/元"
 
 
 class ManualPointAdjustment(models.Model):

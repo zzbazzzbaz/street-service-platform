@@ -15,6 +15,10 @@ class PointRecordOut(Schema):
     source_id: str
     reason: str
     balance_after: int | None = None
+    merchant_id: int | None = None
+    merchant_name: str = ""
+    yuan_amount: str | None = None
+    request_no: str = ""
     created_at: datetime
 
 

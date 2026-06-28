@@ -1,4 +1,4 @@
-from django.db import migrations, models
+from django.db import migrations
 
 
 class Migration(migrations.Migration):
@@ -6,10 +6,4 @@ class Migration(migrations.Migration):
         ("points", "0002_manualpointadjustment"),
     ]
 
-    operations = [
-        migrations.AddField(
-            model_name="pointrecord",
-            name="balance_after",
-            field=models.IntegerField(blank=True, null=True, verbose_name="变动后余额"),
-        ),
-    ]
+    operations = []

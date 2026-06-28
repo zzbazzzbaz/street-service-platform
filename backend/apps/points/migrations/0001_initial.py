@@ -10,6 +10,7 @@ class Migration(migrations.Migration):
     initial = True
 
     dependencies = [
+        ('merchants', '0001_initial'),
         ('members', '0001_initial'),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
@@ -34,11 +35,15 @@ class Migration(migrations.Migration):
                 ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
                 ('amount', models.IntegerField(verbose_name='积分变动值')),
                 ('change_type', models.CharField(choices=[('income', '收入'), ('expense', '扣减')], max_length=20, verbose_name='变动类型')),
-                ('source_type', models.CharField(choices=[('learning', '学习'), ('report', '随手拍'), ('activity', '活动'), ('elder_service', '老人服务'), ('manual', '人工'), ('product_redemption', '商品兑换')], max_length=32, verbose_name='来源类型')),
+                ('source_type', models.CharField(choices=[('learning', '学习'), ('report', '随手拍'), ('activity', '活动'), ('elder_service', '老人服务'), ('manual', '人工'), ('merchant_payment', '商户积分支付')], max_length=32, verbose_name='来源类型')),
                 ('source_id', models.CharField(blank=True, max_length=64, verbose_name='来源ID')),
                 ('reason', models.CharField(max_length=255, verbose_name='原因')),
+                ('balance_after', models.IntegerField(blank=True, null=True, verbose_name='变动后余额')),
+                ('yuan_amount', models.DecimalField(blank=True, decimal_places=2, max_digits=10, null=True, verbose_name='折算金额')),
+                ('request_no', models.CharField(blank=True, max_length=64, verbose_name='请求号')),
                 ('created_at', models.DateTimeField(auto_now_add=True, verbose_name='创建时间')),
                 ('member', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='point_records', to='members.member', verbose_name='用户')),
+                ('merchant', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='point_records', to='merchants.merchant', verbose_name='商户')),
                 ('operator', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='operated_point_records', to=settings.AUTH_USER_MODEL, verbose_name='操作人')),
             ],
             options={
@@ -46,6 +51,22 @@ class Migration(migrations.Migration):
                 'verbose_name_plural': '积分流水',
                 'db_table': 'points_record',
                 'ordering': ('-created_at', '-id'),
+                'constraints': [models.UniqueConstraint(condition=models.Q(('request_no', ''), _negated=True), fields=('merchant', 'request_no'), name='uniq_merchant_point_record_request_no')],
+            },
+        ),
+        migrations.CreateModel(
+            name='PointExchangeRule',
+            fields=[
+                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
+                ('points_per_yuan', models.PositiveIntegerField(verbose_name='每元所需积分')),
+                ('is_active', models.BooleanField(default=True, verbose_name='是否启用')),
+                ('updated_at', models.DateTimeField(auto_now=True, verbose_name='更新时间')),
+            ],
+            options={
+                'verbose_name': '积分兑换比例',
+                'verbose_name_plural': '积分兑换比例',
+                'db_table': 'points_exchange_rule',
+                'ordering': ('-updated_at', '-id'),
             },
         ),
     ]
