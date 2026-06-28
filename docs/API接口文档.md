@@ -848,7 +848,7 @@
 - `activity`
 - `elder_service`
 - `manual`
-- `product_redemption`
+- `merchant_payment`
 
 积分规则：
 
@@ -856,7 +856,7 @@
 - 积分扣减前会校验余额，余额不足时拒绝。
 - 后台人工加分必须填写原因并记录操作人。
 
-## 8. 商品兑换 用户端
+## 8. 商户积分支付 用户端
 
 ### 8.1 用户端商户列表
 
@@ -882,59 +882,11 @@
 | `address` | string | 经营地址 |
 | `is_active` | boolean | 是否启用 |
 
-响应 `data` 分页字段：
+说明：接口仅返回启用商户。用户扫码解析出 `merchant_id` 后，也可以直接调用支付信息接口。
 
-| 字段 | 类型 | 说明 |
-| --- | --- | --- |
-| `items` | array | 商户列表 |
-| `total` | integer | 总数量 |
-| `page` | integer | 当前页码 |
-| `page_size` | integer | 每页数量 |
+### 8.2 商户支付信息
 
-说明：接口仅返回启用商户。用户点击商户后，通过 `merchant_id` 查询该商户商品列表。
-
-### 8.2 可兑换商品列表
-
-`GET /api/merchant-products`
-
-认证：用户 token。
-
-查询参数：
-
-| 字段 | 类型 | 必填 | 说明 |
-| --- | --- | --- | --- |
-| `page` | integer | 否 | 页码 |
-| `page_size` | integer | 否 | 每页数量 |
-| `merchant_id` | integer | 否 | 商户 ID；传入后只返回该商户商品 |
-
-响应 `data.items[]`：
-
-| 字段 | 类型 | 说明 |
-| --- | --- | --- |
-| `id` | integer | 商品 ID |
-| `merchant_id` | integer | 商户 ID |
-| `merchant_name` | string | 商户名称 |
-| `name` | string | 商品名称 |
-| `image` | string | 商品图片 URL |
-| `description` | string | 商品说明 |
-| `points_required` | integer | 兑换所需积分 |
-| `is_active` | boolean | 是否上架 |
-| `created_at` | datetime | 创建时间 |
-
-响应 `data` 分页字段：
-
-| 字段 | 类型 | 说明 |
-| --- | --- | --- |
-| `items` | array | 可兑换商品列表 |
-| `total` | integer | 总数量 |
-| `page` | integer | 当前页码 |
-| `page_size` | integer | 每页数量 |
-
-说明：接口仅返回启用商户下的上架商品。不传 `merchant_id` 时返回全部可兑换商品。
-
-### 8.3 可兑换商品详情
-
-`GET /api/merchant-products/{product_id}`
+`GET /api/merchants/{merchant_id}/payment-info`
 
 认证：用户 token。
 
@@ -942,25 +894,22 @@
 
 | 字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `product_id` | integer | 商品 ID |
+| `merchant_id` | integer | 商户 ID |
 
 响应 `data`：
 
 | 字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `id` | integer | 商品 ID |
 | `merchant_id` | integer | 商户 ID |
 | `merchant_name` | string | 商户名称 |
-| `name` | string | 商品名称 |
-| `image` | string | 商品图片 URL |
-| `description` | string | 商品说明 |
-| `points_required` | integer | 兑换所需积分 |
-| `is_active` | boolean | 是否上架 |
-| `created_at` | datetime | 创建时间 |
+| `phone` | string | 商户手机号 |
+| `address` | string | 商户地址 |
+| `points_per_yuan` | integer | 多少积分抵 1 元 |
+| `balance` | integer | 当前用户积分余额 |
 
-### 8.4 使用积分兑换商品
+### 8.3 商户积分支付
 
-`POST /api/merchant-products/{product_id}/redeem`
+`POST /api/merchants/{merchant_id}/point-payments`
 
 认证：用户 token。
 
@@ -968,74 +917,38 @@
 
 | 字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `product_id` | integer | 商品 ID |
+| `merchant_id` | integer | 商户 ID |
 
-请求体字段：无。
+请求体：
+
+```json
+{
+  "points": 100,
+  "request_no": "client-request-id"
+}
+```
 
 响应 `data`：
 
 | 字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `id` | integer | 兑换记录 ID |
+| `id` | integer | 积分流水 ID |
 | `merchant_id` | integer | 商户 ID |
 | `merchant_name` | string | 商户名称 |
-| `product_id` | integer | 商品 ID |
-| `product_name` | string | 商品名称 |
-| `member_id` | integer | 用户 ID |
-| `member_name_masked` | string | 用户昵称脱敏 |
-| `member_phone_masked` | string | 用户手机号脱敏 |
-| `points_spent` | integer | 消耗积分 |
-| `status` | string | `pending` 或 `completed` |
-| `point_record_id` | integer/null | 关联积分流水 ID |
-| `created_at` | datetime | 创建时间 |
+| `points` | integer | 本次扣减积分 |
+| `yuan_amount` | string | 按支付时比例折算金额 |
+| `balance_after` | integer | 支付后积分余额 |
+| `request_no` | string | 请求号 |
+| `created_at` | datetime | 支付时间 |
 
 业务规则：
 
-- 商品必须上架。
-- 商品所需积分必须大于 0。
+- 商户必须启用。
+- 积分值必须大于 0。
 - 用户积分余额必须足够。
-- 兑换成功后扣减积分并生成积分流水。
-- 兑换记录默认状态为 `pending`。
-- 商户向用户交付商品后，可通过商户端接口确认完成。
-
-### 8.5 我的商品兑换记录
-
-`GET /api/product-redemptions`
-
-认证：用户 token。
-
-查询参数：
-
-| 字段 | 类型 | 必填 | 说明 |
-| --- | --- | --- | --- |
-| `page` | integer | 否 | 页码 |
-| `page_size` | integer | 否 | 每页数量 |
-
-响应 `data.items[]`：
-
-| 字段 | 类型 | 说明 |
-| --- | --- | --- |
-| `id` | integer | 兑换记录 ID |
-| `merchant_id` | integer | 商户 ID |
-| `merchant_name` | string | 商户名称 |
-| `product_id` | integer | 商品 ID |
-| `product_name` | string | 商品名称 |
-| `member_id` | integer | 用户 ID |
-| `member_name_masked` | string | 用户昵称脱敏 |
-| `member_phone_masked` | string | 用户手机号脱敏 |
-| `points_spent` | integer | 消耗积分 |
-| `status` | string | `pending` 或 `completed` |
-| `point_record_id` | integer/null | 关联积分流水 ID |
-| `created_at` | datetime | 创建时间 |
-
-响应 `data` 分页字段：
-
-| 字段 | 类型 | 说明 |
-| --- | --- | --- |
-| `items` | array | 商品兑换记录列表 |
-| `total` | integer | 总数量 |
-| `page` | integer | 当前页码 |
-| `page_size` | integer | 每页数量 |
+- 后台必须已配置启用的积分兑换比例。
+- `request_no` 非空时，同一商户重复提交同一请求号返回原流水，不重复扣分。
+- 系统不记录商品和订单流水，只生成积分流水。
 
 ## 9. 商户端
 
@@ -1058,14 +971,6 @@
 }
 ```
 
-正式微信登录请求形态：
-
-```json
-{
-  "code": "wx-code"
-}
-```
-
 响应 `data`：
 
 | 字段 | 类型 | 说明 |
@@ -1081,36 +986,29 @@
 | `merchant.address` | string | 经营地址 |
 | `merchant.is_active` | boolean | 是否启用 |
 
-说明：
-
-- `openid` 和 `code` 至少传一个。
-- 传入 `openid` 时走开发期测试登录。
-- 未配置 `WECHAT_MINIAPP_APPID` 或 `WECHAT_MINIAPP_SECRET` 时返回业务错误：`商户微信登录未配置，开发期请使用测试登录`。
-- 一期保留 `code` 请求形态，不接入正式微信登录。
-
 ### 9.2 当前商户信息
 
 `GET /api/merchant/me`
 
 认证：商户 token。
 
-请求参数：无路径参数、无查询参数、无请求体。
+### 9.3 商户固定码
+
+`GET /api/merchant/fixed-code`
+
+认证：商户 token。
 
 响应 `data`：
 
 | 字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `id` | integer | 商户 ID |
-| `openid` | string | 商户 openid |
-| `name` | string | 商户名称 |
-| `contact_name` | string | 联系人 |
-| `phone` | string | 手机号 |
-| `address` | string | 经营地址 |
-| `is_active` | boolean | 是否启用 |
+| `merchant_id` | integer | 商户 ID |
+| `merchant_name` | string | 商户名称 |
+| `code_content` | string | 固定码内容，前端可据此生成二维码 |
 
-### 9.3 商户商品兑换记录
+### 9.4 商户积分支付流水
 
-`GET /api/merchant/redemptions`
+`GET /api/merchant/point-records`
 
 认证：商户 token。
 
@@ -1125,90 +1023,17 @@
 
 | 字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `id` | integer | 兑换记录 ID |
+| `id` | integer | 积分流水 ID |
 | `merchant_id` | integer | 商户 ID |
 | `merchant_name` | string | 商户名称 |
-| `product_id` | integer | 商品 ID |
-| `product_name` | string | 商品名称 |
 | `member_id` | integer | 用户 ID |
 | `member_name_masked` | string | 用户昵称脱敏 |
 | `member_phone_masked` | string | 用户手机号脱敏 |
-| `points_spent` | integer | 消耗积分 |
-| `status` | string | `pending` 或 `completed` |
-| `point_record_id` | integer/null | 关联积分流水 ID |
-| `created_at` | datetime | 创建时间 |
-
-响应 `data` 分页字段：
-
-| 字段 | 类型 | 说明 |
-| --- | --- | --- |
-| `items` | array | 当前商户商品兑换记录列表 |
-| `total` | integer | 总数量 |
-| `page` | integer | 当前页码 |
-| `page_size` | integer | 每页数量 |
-
-### 9.4 商户确认商品交付
-
-`POST /api/merchant/redemptions/{redemption_id}/complete`
-
-认证：商户 token。
-
-路径参数：
-
-| 字段 | 类型 | 说明 |
-| --- | --- | --- |
-| `redemption_id` | integer | 商品兑换记录 ID |
-
-请求参数：无查询参数、无请求体。
-
-响应 `data`：
-
-| 字段 | 类型 | 说明 |
-| --- | --- | --- |
-| `id` | integer | 兑换记录 ID |
-| `merchant_id` | integer | 商户 ID |
-| `merchant_name` | string | 商户名称 |
-| `product_id` | integer | 商品 ID |
-| `product_name` | string | 商品名称 |
-| `member_id` | integer | 用户 ID |
-| `member_name_masked` | string | 用户昵称脱敏 |
-| `member_phone_masked` | string | 用户手机号脱敏 |
-| `points_spent` | integer | 消耗积分 |
-| `status` | string | 固定返回 `completed` |
-| `point_record_id` | integer/null | 关联积分流水 ID |
-| `created_at` | datetime | 创建时间 |
-
-业务规则：
-
-- 只能确认当前登录商户自己的兑换记录。
-- 商户向用户交付商品后调用本接口完成核销。
-- 已完成的兑换记录不能重复确认。
-- 访问其他商户的兑换记录返回 `404`。
-
-### 9.5 商户月度兑换汇总
-
-`GET /api/merchant/redemptions/summary`
-
-认证：商户 token。
-
-查询参数：
-
-| 字段 | 类型 | 必填 | 说明 |
-| --- | --- | --- | --- |
-| `month` | string | 是 | 月份，格式 `YYYY-MM` |
-
-响应 `data`：
-
-| 字段 | 类型 | 说明 |
-| --- | --- | --- |
-| `month` | string | 月份 |
-| `redemption_count` | integer | 兑换笔数 |
-| `product_count` | integer | 兑换商品种类数 |
-| `points_total` | integer | 消耗积分合计 |
-
-错误规则：
-
-- `month` 格式不是 `YYYY-MM` 时返回业务错误：`月份格式必须为 YYYY-MM`。
+| `points` | integer | 扣减积分 |
+| `yuan_amount` | string | 折算金额 |
+| `balance_after` | integer/null | 用户支付后积分余额 |
+| `request_no` | string | 请求号 |
+| `created_at` | datetime | 支付时间 |
 
 ## 10. 健康检查
 
@@ -1297,20 +1122,19 @@ flowchart TD
     G -->|驳回| J[状态 rejected 并记录审核意见]
 ```
 
-### 11.6 商品兑换与商户查询流程
+### 11.6 商户积分支付流程
 
 ```mermaid
 flowchart TD
-    A[后台维护商户和商品] --> B[用户 GET /api/merchant-products]
-    B --> C[GET /api/merchant-products/id]
-    C --> D[POST /api/merchant-products/id/redeem]
-    D --> E{积分余额足够}
-    E -->|否| F[返回积分余额不足]
-    E -->|是| G[扣减积分并生成流水]
-    G --> H[生成 pending 兑换记录]
-    H --> I[商户 POST /api/merchant/auth/wechat-login]
-    I --> J[GET /api/merchant/redemptions 查看待交付记录]
-    J --> K[商户交付商品]
-    K --> L[POST /api/merchant/redemptions/id/complete 确认核销]
-    L --> M[GET /api/merchant/redemptions/summary?month=YYYY-MM 查看月度汇总]
+    A[后台维护商户和兑换比例] --> B[商户 GET /api/merchant/fixed-code]
+    B --> C[商户展示固定二维码]
+    C --> D[用户扫码解析 merchant_id]
+    D --> E[GET /api/merchants/id/payment-info]
+    E --> F[用户输入抵扣积分]
+    F --> G[POST /api/merchants/id/point-payments]
+    G --> H{积分余额足够}
+    H -->|否| I[返回积分余额不足]
+    H -->|是| J[扣减积分并生成商户支付积分流水]
+    J --> K[用户展示支付成功结果]
+    K --> L[商户 GET /api/merchant/point-records 查看流水]
 ```

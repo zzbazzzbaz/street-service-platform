@@ -158,9 +158,9 @@
 
 前端对接建议：
 
-- 商品兑换入口采用普通页面流转：商户列表 -> 商户商品列表 -> 商品兑换。
-- 点击某个商户后调用 `GET /api/merchant-products?merchant_id=<商户ID>`。
-- MVP 不提供商户商品兑换入口码，不做扫码进入兑换列表。
+- 商户端调用 `GET /api/merchant/fixed-code` 获取固定码内容并生成二维码。
+- 用户端扫码解析出 `merchant_id` 后调用 `GET /api/merchants/{merchant_id}/payment-info`。
+- 用户输入抵扣积分后调用 `POST /api/merchants/{merchant_id}/point-payments`。
 
 ## 3. 已有接口字段变更
 
@@ -273,67 +273,50 @@
 }
 ```
 
-### 3.4 商品列表按商户筛选
+### 3.4 商户积分支付流程
 
 接口：
 
-- `GET /api/merchant-products`
-
-新增查询参数：
-
-| 字段 | 类型 | 必填 | 说明 |
-| --- | --- | --- | --- |
-| `merchant_id` | integer | 否 | 商户 ID；传入后只返回该商户上架商品 |
+- `GET /api/merchant/fixed-code`
+- `GET /api/merchants/{merchant_id}/payment-info`
+- `POST /api/merchants/{merchant_id}/point-payments`
+- `GET /api/merchant/point-records`
 
 前端流程：
 
-- 商户列表页：调用 `GET /api/merchants`。
-- 商户商品页：调用 `GET /api/merchant-products?merchant_id=<商户ID>`。
-- 商品兑换：调用 `POST /api/merchant-products/{product_id}/redeem`。
+1. 商户端调用 `GET /api/merchant/fixed-code` 获取固定码内容并生成二维码。
+2. 用户端扫码解析出 `merchant_id`。
+3. 用户端调用 `GET /api/merchants/{merchant_id}/payment-info` 展示商户、余额和兑换比例。
+4. 用户输入本次抵扣积分，调用 `POST /api/merchants/{merchant_id}/point-payments`。
+5. 支付成功页展示商户名称、扣减积分、折算金额、支付时间和流水 ID，供商户查看。
+6. 商户端调用 `GET /api/merchant/point-records` 查看本商户积分支付流水。
 
-### 3.5 商品兑换记录
-
-接口：
-
-- `POST /api/merchant-products/{product_id}/redeem`
-- `GET /api/product-redemptions`
-- `GET /api/merchant/redemptions`
-- `POST /api/merchant/redemptions/{redemption_id}/complete`
-
-新增返回字段：
-
-| 字段 | 类型 | 说明 |
-| --- | --- | --- |
-| `merchant_name` | string | 商户名称 |
-| `member_name_masked` | string | 用户昵称脱敏 |
-| `member_phone_masked` | string | 用户手机号脱敏 |
-| `point_record_id` | integer/null | 关联积分流水 ID |
-
-响应项示例：
+支付请求示例：
 
 ```json
 {
-  "id": 1,
-  "merchant_id": 2,
-  "merchant_name": "便民超市",
-  "product_id": 3,
-  "product_name": "兑换商品",
-  "member_id": 4,
-  "member_name_masked": "张*",
-  "member_phone_masked": "138****0000",
-  "points_spent": 20,
-  "status": "pending",
-  "point_record_id": 9,
-  "created_at": "2026-06-26T10:00:00+08:00"
+  "points": 100,
+  "request_no": "client-request-id"
 }
 ```
+
+支付成功响应核心字段：
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `id` | integer | 积分流水 ID |
+| `merchant_id` | integer | 商户 ID |
+| `merchant_name` | string | 商户名称 |
+| `points` | integer | 本次扣减积分 |
+| `yuan_amount` | string | 折算金额 |
+| `balance_after` | integer | 支付后余额 |
+| `created_at` | datetime | 支付时间 |
 
 ## 4. 本轮仍未实现的能力
 
 - 微信手机号解密登录。
 - 用户信息审核、后台审核 API。
 - 助老服务对口老人关系和任务分配。
-- 固定二维码积分抵扣、固定优惠规则、抵扣流水。
-- 商户结算金额和历史结清。
+- 商品明细、订单流水、商户结算金额和历史结清。
 - 社情民意、问题反馈。
 - 随手拍分类、多图正式模型。
