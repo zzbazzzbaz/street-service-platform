@@ -830,6 +830,10 @@
 | `source_id` | string | 来源业务 ID |
 | `reason` | string | 变动原因 |
 | `balance_after` | integer/null | 本次变动后的余额；历史记录可能为空 |
+| `merchant_id` | integer/null | 商户积分支付对应的商户 ID；非商户支付流水为空 |
+| `merchant_name` | string | 商户名称；非商户支付流水为空字符串 |
+| `yuan_amount` | string/null | 商户积分支付折算金额 |
+| `request_no` | string | 商户积分支付请求号 |
 | `created_at` | datetime | 创建时间 |
 
 响应 `data` 分页字段：
@@ -855,6 +859,7 @@
 - 所有积分增加或扣减都会生成 `PointRecord`。
 - 积分扣减前会校验余额，余额不足时拒绝。
 - 后台人工加分必须填写原因并记录操作人。
+- 商户积分支付流水的 `source_type` 为 `merchant_payment`，并会写入商户和折算金额字段。
 
 ## 8. 商户积分支付 用户端
 
@@ -907,6 +912,12 @@
 | `points_per_yuan` | integer | 多少积分抵 1 元 |
 | `balance` | integer | 当前用户积分余额 |
 
+错误规则：
+
+- 商户不存在时返回 `404`。
+- 商户已停用时返回业务错误：`商户已停用`。
+- 后台未配置启用兑换比例时返回业务错误：`积分兑换比例未配置`。
+
 ### 8.3 商户积分支付
 
 `POST /api/merchants/{merchant_id}/point-payments`
@@ -927,6 +938,13 @@
   "request_no": "client-request-id"
 }
 ```
+
+请求体字段：
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `points` | integer | 是 | 本次要抵扣的积分 |
+| `request_no` | string | 否 | 前端请求号；同一商户同一请求号幂等 |
 
 响应 `data`：
 
@@ -949,6 +967,14 @@
 - 后台必须已配置启用的积分兑换比例。
 - `request_no` 非空时，同一商户重复提交同一请求号返回原流水，不重复扣分。
 - 系统不记录商品和订单流水，只生成积分流水。
+
+错误规则：
+
+- 商户不存在时返回 `404`。
+- 商户已停用时返回业务错误：`商户已停用`。
+- 积分值小于等于 0 时返回业务错误：`积分值必须大于 0`。
+- 积分余额不足时返回业务错误：`积分余额不足`。
+- 后台未配置启用兑换比例时返回业务错误：`积分兑换比例未配置`。
 
 ## 9. 商户端
 
@@ -992,6 +1018,18 @@
 
 认证：商户 token。
 
+响应 `data`：
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `id` | integer | 商户 ID |
+| `openid` | string | 商户 openid |
+| `name` | string | 商户名称 |
+| `contact_name` | string | 联系人 |
+| `phone` | string | 手机号 |
+| `address` | string | 经营地址 |
+| `is_active` | boolean | 是否启用 |
+
 ### 9.3 商户固定码
 
 `GET /api/merchant/fixed-code`
@@ -1005,6 +1043,8 @@
 | `merchant_id` | integer | 商户 ID |
 | `merchant_name` | string | 商户名称 |
 | `code_content` | string | 固定码内容，前端可据此生成二维码 |
+
+说明：`code_content` 当前格式为 `street-service://merchant-pay?merchant_id=<商户ID>`，前端可直接编码为二维码。
 
 ### 9.4 商户积分支付流水
 
@@ -1034,6 +1074,17 @@
 | `balance_after` | integer/null | 用户支付后积分余额 |
 | `request_no` | string | 请求号 |
 | `created_at` | datetime | 支付时间 |
+
+响应 `data` 分页字段：
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `items` | array | 当前商户积分支付流水列表 |
+| `total` | integer | 总数量 |
+| `page` | integer | 当前页码 |
+| `page_size` | integer | 每页数量 |
+
+说明：接口仅返回当前登录商户、且 `source_type = merchant_payment` 的积分流水。
 
 ## 10. 健康检查
 
