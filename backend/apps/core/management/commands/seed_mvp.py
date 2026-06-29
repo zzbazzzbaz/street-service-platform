@@ -5,11 +5,13 @@ from django.core.management.base import BaseCommand
 from django.utils import timezone
 
 from apps.activities.models import Activity, ActivityCheckin, ActivitySignup
-from apps.elder_services.models import ElderServiceFeedback, ElderServiceTask
+from apps.civic_feedbacks.models import CivicFeedback
+from apps.elder_services.models import ElderCareRelation, ElderServiceFeedback, ElderServiceTask
 from apps.learning.models import LearningContent, LearningRecord
 from apps.members.models import Member
-from apps.merchants.models import Merchant
+from apps.merchants.models import Merchant, MerchantSettlement
 from apps.points.models import PointAccount, PointExchangeRule, PointRecord
+from apps.problem_feedbacks.models import ProblemFeedback
 from apps.reports.models import Report
 
 
@@ -69,11 +71,29 @@ class Command(BaseCommand):
 
         member, _ = Member.objects.update_or_create(
             openid="test-openid",
-            defaults={"nickname": "前端测试用户", "phone": "13800000000", "is_active": True},
+            defaults={
+                "nickname": "前端测试用户",
+                "phone": "13800000000",
+                "real_name": "李建国",
+                "identity_type": Member.IdentityType.COURIER,
+                "audit_status": Member.AuditStatus.APPROVED,
+                "audit_remark": "",
+                "audit_submitted_at": now,
+                "is_active": True,
+            },
         )
         Member.objects.update_or_create(
             openid="test-member-openid",
-            defaults={"nickname": "兼容测试用户", "phone": "13800000001", "is_active": True},
+            defaults={
+                "nickname": "兼容测试用户",
+                "phone": "13800000001",
+                "real_name": "王小明",
+                "identity_type": Member.IdentityType.NORMAL_USER,
+                "audit_status": Member.AuditStatus.APPROVED,
+                "audit_remark": "",
+                "audit_submitted_at": now,
+                "is_active": True,
+            },
         )
 
         merchant, _ = Merchant.objects.update_or_create(
@@ -148,30 +168,78 @@ class Command(BaseCommand):
             defaults={"status": ActivityCheckin.Status.PENDING, "review_comment": ""},
         )
 
+        elder_relation, _ = ElderCareRelation.objects.update_or_create(
+            member=member,
+            elder_name="刘阿姨",
+            defaults={"elder_address": "幸福小区 3 号楼", "frequency": "每周一次", "is_active": True},
+        )
+        delivery_relation, _ = ElderCareRelation.objects.update_or_create(
+            member=member,
+            elder_name="张爷爷",
+            defaults={"elder_address": "邻里服务站附近", "frequency": "按需配送", "is_active": True},
+        )
+
         elder_task, _ = ElderServiceTask.objects.update_or_create(
             title="探访老人服务",
-            defaults={"description": "协助社区探访独居老人，记录基本需求并反馈给工作人员。", "location": "幸福小区", "points": 10, "status": ElderServiceTask.Status.PUBLISHED},
+            defaults={
+                "relation": elder_relation,
+                "description": "协助社区探访独居老人，记录基本需求并反馈给工作人员。",
+                "location": "幸福小区",
+                "points": 10,
+                "status": ElderServiceTask.Status.PUBLISHED,
+            },
         )
         ElderServiceTask.objects.update_or_create(
             title="助老物资配送",
-            defaults={"description": "为行动不便老人配送社区服务站准备的生活物资。", "location": "邻里服务站", "points": 8, "status": ElderServiceTask.Status.PUBLISHED},
+            defaults={
+                "relation": delivery_relation,
+                "description": "为行动不便老人配送社区服务站准备的生活物资。",
+                "location": "邻里服务站",
+                "points": 8,
+                "status": ElderServiceTask.Status.PUBLISHED,
+            },
         )
         ElderServiceFeedback.objects.update_or_create(
             member=member,
             task=elder_task,
-            defaults={"content": "已完成探访，老人反馈需要后续协助维修楼道照明。", "status": ElderServiceFeedback.Status.PENDING, "review_comment": ""},
+            defaults={
+                "relation": elder_relation,
+                "content": "已完成探访，老人反馈需要后续协助维修楼道照明。",
+                "image_urls": [],
+                "status": ElderServiceFeedback.Status.PENDING,
+                "review_comment": "",
+            },
         )
 
         Report.objects.update_or_create(
             member=member,
             title="路灯故障上报",
             defaults={
+                "category_code": Report.CategoryCode.ROAD_LIGHT,
                 "description": "幸福小区 3 号楼旁路灯夜间不亮，影响居民通行。",
                 "location": "幸福小区 3 号楼",
+                "image_urls": ["https://example.com/media/uploads/report/seed-light.png"],
                 "points": 5,
                 "status": Report.Status.PENDING,
                 "review_comment": "",
             },
+        )
+
+        CivicFeedback.objects.update_or_create(
+            member=member,
+            title="建议增设临时停车引导牌",
+            defaults={
+                "content": "学校门口早高峰停车较乱，建议增加引导牌。",
+                "material_urls": [],
+                "status": CivicFeedback.Status.SUBMITTED,
+                "reply": "",
+                "points": 0,
+            },
+        )
+        ProblemFeedback.objects.update_or_create(
+            member=member,
+            title="账号资料展示问题",
+            defaults={"content": "希望能在个人中心直接查看审核状态。", "status": ProblemFeedback.Status.SUBMITTED, "reply": ""},
         )
 
         ensure_point_record(
@@ -192,6 +260,22 @@ class Command(BaseCommand):
             merchant=merchant,
             yuan_amount=Decimal("1.00"),
             request_no="seed-merchant-payment",
+        )
+
+        MerchantSettlement.objects.update_or_create(
+            merchant=merchant,
+            period_label=now.strftime("%Y-%m"),
+            defaults={
+                "period_type": MerchantSettlement.PeriodType.MONTH,
+                "date_from": now.date().replace(day=1),
+                "date_to": now.date(),
+                "record_count": 1,
+                "total_points": 100,
+                "total_yuan_amount": Decimal("1.00"),
+                "status": MerchantSettlement.Status.PENDING,
+                "processor_name": "",
+                "remark": "开发测试结算记录",
+            },
         )
 
         refresh_point_account(member)

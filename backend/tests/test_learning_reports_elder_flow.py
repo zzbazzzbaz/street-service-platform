@@ -69,6 +69,8 @@ class LearningReportsElderFlowTests(TestCase):
         self.assertEqual(list_response.status_code, 200)
         self.assertEqual(list_response.json()["data"]["total"], 1)
         list_item = list_response.json()["data"]["items"][0]
+        self.assertFalse(list_item["is_completed"])
+        self.assertIsNone(list_item["completed_at"])
         self.assertEqual(list_item["content_type"], "video")
         self.assertEqual(list_item["cover_url"], list_item["cover"])
         self.assertEqual(len(list_item["image_urls"]), 1)
@@ -76,6 +78,8 @@ class LearningReportsElderFlowTests(TestCase):
         self.assertIn("/media/learning/videos/safety.mp4", list_item["video_url"])
         self.assertEqual(detail_response.status_code, 200)
         detail_data = detail_response.json()["data"]
+        self.assertFalse(detail_data["is_completed"])
+        self.assertIsNone(detail_data["completed_at"])
         self.assertEqual(detail_data["content_type"], "video")
         self.assertEqual(detail_data["cover_url"], detail_data["cover"])
         self.assertEqual(len(detail_data["image_urls"]), 1)
@@ -83,6 +87,13 @@ class LearningReportsElderFlowTests(TestCase):
         self.assertIn("/media/learning/videos/safety.mp4", detail_data["video_url"])
         self.assertEqual(complete_response.status_code, 200)
         self.assertTrue(LearningRecord.objects.get(member=self.member, content=content).is_completed)
+
+        completed_list_item = self.client.get("/api/learning/contents", **headers).json()["data"]["items"][0]
+        completed_detail = self.client.get(f"/api/learning/contents/{content.id}", **headers).json()["data"]
+        self.assertTrue(completed_list_item["is_completed"])
+        self.assertIsNotNone(completed_list_item["completed_at"])
+        self.assertTrue(completed_detail["is_completed"])
+        self.assertIsNotNone(completed_detail["completed_at"])
 
     def test_missing_learning_content_uses_unified_404_response(self):
         headers = auth_header("member", self.member.openid)
@@ -94,8 +105,20 @@ class LearningReportsElderFlowTests(TestCase):
         self.assertIn("message", response.json())
 
     def test_report_review_approve_awards_points_and_reject_does_not(self):
-        approved = submit_report(self.member, title="井盖破损", description="描述", image="", location="路口")
-        rejected = submit_report(self.member, title="重复问题", description="描述", image="", location="路口")
+        approved = submit_report(
+            self.member,
+            category_code=Report.CategoryCode.WELL_COVER,
+            description="描述",
+            location="路口",
+            image_urls=["https://example.com/a.png"],
+        )
+        rejected = submit_report(
+            self.member,
+            category_code=Report.CategoryCode.OTHER,
+            description="描述",
+            location="路口",
+            image_urls=["https://example.com/b.png"],
+        )
 
         review_report(approved, action="approve", comment="", operator=self.operator)
         review_report(rejected, action="reject", comment="不符合要求", operator=self.operator)

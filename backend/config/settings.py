@@ -38,6 +38,8 @@ INSTALLED_APPS = [
     "apps.members",
     "apps.learning",
     "apps.reports",
+    "apps.civic_feedbacks",
+    "apps.problem_feedbacks",
     "apps.activities",
     "apps.elder_services",
     "apps.points",
@@ -179,6 +181,8 @@ SIMPLEUI_CONFIG = {
             "permission": "reports.view_report",
             "models": [
                 {"name": "上报记录", "icon": "fas fa-file-lines", "url": "/admin/reports/report/", "permission": "reports.view_report"},
+                {"name": "社情民意", "icon": "fas fa-comments", "url": "/admin/civic_feedbacks/civicfeedback/", "permission": "civic_feedbacks.view_civicfeedback"},
+                {"name": "问题反馈", "icon": "fas fa-circle-question", "url": "/admin/problem_feedbacks/problemfeedback/", "permission": "problem_feedbacks.view_problemfeedback"},
             ],
         },
         {
@@ -197,6 +201,7 @@ SIMPLEUI_CONFIG = {
             "permission": "elder_services.view_elderservicetask",
             "models": [
                 {"name": "服务任务", "icon": "fas fa-list-check", "url": "/admin/elder_services/elderservicetask/", "permission": "elder_services.view_elderservicetask"},
+                {"name": "小哥-老人关系", "icon": "fas fa-user-friends", "url": "/admin/elder_services/eldercarerelation/", "permission": "elder_services.view_eldercarerelation"},
                 {"name": "服务反馈", "icon": "fas fa-comment-dots", "url": "/admin/elder_services/elderservicefeedback/", "permission": "elder_services.view_elderservicefeedback"},
             ],
         },
@@ -210,6 +215,7 @@ SIMPLEUI_CONFIG = {
                 {"name": "人工调分", "icon": "fas fa-pen-to-square", "url": "/admin/points/manualpointadjustment/", "permission": "points.view_manualpointadjustment"},
                 {"name": "积分兑换比例", "icon": "fas fa-scale-balanced", "url": "/admin/points/pointexchangerule/", "permission": "points.view_pointexchangerule"},
                 {"name": "商户", "icon": "fas fa-shop", "url": "/admin/merchants/merchant/", "permission": "merchants.view_merchant"},
+                {"name": "商户结算", "icon": "fas fa-file-invoice-dollar", "url": "/admin/merchants/merchantsettlement/", "permission": "merchants.view_merchantsettlement"},
             ],
         },
         {

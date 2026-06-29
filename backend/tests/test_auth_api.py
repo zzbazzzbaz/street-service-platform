@@ -1,8 +1,10 @@
-from django.test import TestCase
+from unittest.mock import patch
+
+from django.test import TestCase, override_settings
 
 from apps.members.models import Member
 from apps.merchants.models import Merchant
-from shared.auth import issue_token
+from shared.auth import issue_token, parse_token
 
 
 class AuthApiTests(TestCase):
@@ -20,6 +22,9 @@ class AuthApiTests(TestCase):
         self.assertEqual(payload["code"], 0)
         self.assertEqual(payload["data"]["token_type"], "Bearer")
         self.assertEqual(payload["data"]["member"]["openid"], "member-openid")
+        self.assertEqual(payload["data"]["member"]["identity_type"], "normal_user")
+        self.assertEqual(payload["data"]["member"]["audit_status"], "none")
+        self.assertEqual(payload["data"]["member"]["audit_remark"], "")
         self.assertTrue(Member.objects.filter(openid="member-openid").exists())
 
     def test_wechat_login_validation_error_uses_unified_response(self):
@@ -45,6 +50,7 @@ class AuthApiTests(TestCase):
         self.assertEqual(payload["data"]["merchant"]["openid"], "merchant-openid")
         self.assertTrue(Merchant.objects.filter(openid="merchant-openid").exists())
 
+    @override_settings(WECHAT_MINIAPP_APPID="", WECHAT_MINIAPP_SECRET="")
     def test_merchant_wechat_login_placeholder_reports_missing_config(self):
         response = self.client.post(
             "/api/merchant/auth/wechat-login",
@@ -55,6 +61,105 @@ class AuthApiTests(TestCase):
         self.assertEqual(response.status_code, 400)
         self.assertEqual(response.json()["code"], 40000)
         self.assertIn("未配置", response.json()["message"])
+
+    def test_member_wechat_phone_login_requires_phone_code(self):
+        response = self.client.post(
+            "/api/auth/wechat-phone-login",
+            {"login_code": "wx-login-code"},
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json()["message"], "缺少手机号授权 code")
+
+    @override_settings(WECHAT_MINIAPP_APPID="", WECHAT_MINIAPP_SECRET="")
+    def test_member_wechat_phone_login_reports_missing_config(self):
+        response = self.client.post(
+            "/api/auth/wechat-phone-login",
+            {"login_code": "wx-login-code", "phone_code": "wx-phone-code"},
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json()["message"], "微信手机号登录未配置")
+
+    @override_settings(WECHAT_MINIAPP_APPID="appid", WECHAT_MINIAPP_SECRET="secret")
+    def test_member_wechat_phone_login_uses_wechat_phone_and_openid_when_configured(self):
+        with (
+            patch("apps.members.services.wechat_code_to_openid", return_value="wx-openid") as openid_mock,
+            patch("apps.members.services.wechat_phone_code_to_phone", return_value="13812345678") as phone_mock,
+        ):
+            response = self.client.post(
+                "/api/auth/wechat-phone-login",
+                {"login_code": "login-code", "phone_code": "phone-code"},
+                content_type="application/json",
+            )
+
+        self.assertEqual(response.status_code, 200)
+        data = response.json()["data"]
+        self.assertEqual(data["member"]["openid"], "wx-openid")
+        self.assertEqual(data["member"]["phone"], "13812345678")
+        self.assertTrue(Member.objects.filter(openid="wx-openid", phone="13812345678").exists())
+        openid_mock.assert_called_once_with("login-code")
+        phone_mock.assert_called_once_with("phone-code")
+
+    def test_merchant_wechat_phone_login_requires_phone_code(self):
+        response = self.client.post(
+            "/api/merchant/auth/wechat-phone-login",
+            {"login_code": "wx-login-code"},
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json()["message"], "缺少手机号授权 code")
+
+    @override_settings(WECHAT_MINIAPP_APPID="", WECHAT_MINIAPP_SECRET="")
+    def test_merchant_wechat_phone_login_reports_missing_config(self):
+        response = self.client.post(
+            "/api/merchant/auth/wechat-phone-login",
+            {"login_code": "wx-login-code", "phone_code": "wx-phone-code"},
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json()["message"], "商户微信手机号登录未配置")
+
+    @override_settings(WECHAT_MINIAPP_APPID="appid", WECHAT_MINIAPP_SECRET="secret")
+    def test_merchant_wechat_phone_login_matches_active_merchant_by_phone(self):
+        merchant = Merchant.objects.create(openid="old-merchant-openid", name="测试商户", phone="13912345678", is_active=True)
+        with (
+            patch("apps.merchants.services.wechat_code_to_openid", return_value="new-merchant-openid") as openid_mock,
+            patch("apps.merchants.services.wechat_phone_code_to_phone", return_value="13912345678") as phone_mock,
+        ):
+            response = self.client.post(
+                "/api/merchant/auth/wechat-phone-login",
+                {"login_code": "login-code", "phone_code": "phone-code"},
+                content_type="application/json",
+            )
+
+        self.assertEqual(response.status_code, 200)
+        data = response.json()["data"]
+        self.assertEqual(data["merchant"]["id"], merchant.id)
+        self.assertEqual(data["merchant"]["openid"], "new-merchant-openid")
+        merchant.refresh_from_db()
+        self.assertEqual(merchant.openid, "new-merchant-openid")
+        openid_mock.assert_called_once_with("login-code")
+        phone_mock.assert_called_once_with("phone-code")
+
+    @override_settings(WECHAT_MINIAPP_APPID="appid", WECHAT_MINIAPP_SECRET="secret")
+    def test_merchant_wechat_phone_login_rejects_unmatched_phone(self):
+        with (
+            patch("apps.merchants.services.wechat_code_to_openid", return_value="new-merchant-openid"),
+            patch("apps.merchants.services.wechat_phone_code_to_phone", return_value="13912345678"),
+        ):
+            response = self.client.post(
+                "/api/merchant/auth/wechat-phone-login",
+                {"login_code": "login-code", "phone_code": "phone-code"},
+                content_type="application/json",
+            )
+
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.json()["message"], "商户账号不存在或未启用")
 
     def test_merchant_test_login_endpoint_is_removed(self):
         response = self.client.post(
@@ -69,7 +174,7 @@ class AuthApiTests(TestCase):
         response = self.client.get("/api/members/me")
 
         self.assertEqual(response.status_code, 401)
-        self.assertEqual(response.json()["code"], 40001)
+        self.assertEqual(response.json()["code"], 40102)
 
     def test_member_me_rejects_merchant_token(self):
         Merchant.objects.create(openid="merchant-openid", name="测试商户")
@@ -77,8 +182,8 @@ class AuthApiTests(TestCase):
 
         response = self.client.get("/api/members/me", HTTP_AUTHORIZATION=f"Bearer {token}")
 
-        self.assertEqual(response.status_code, 401)
-        self.assertEqual(response.json()["code"], 40001)
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.json()["code"], 40301)
 
     def test_disabled_member_returns_403(self):
         Member.objects.create(openid="member-openid", is_active=False)
@@ -87,7 +192,41 @@ class AuthApiTests(TestCase):
         response = self.client.get("/api/members/me", HTTP_AUTHORIZATION=f"Bearer {token}")
 
         self.assertEqual(response.status_code, 403)
-        self.assertEqual(response.json()["code"], 40002)
+        self.assertEqual(response.json()["code"], 40301)
+
+    def test_expired_token_returns_40101(self):
+        token, _ = issue_token(subject_type="member", openid="member-openid")
+        identity = parse_token(token)
+        expired_token, _ = issue_token(subject_type="member", openid=identity.openid)
+        from shared import auth as auth_module
+
+        payload = auth_module._decode_jwt(expired_token)
+        payload["exp"] = 1
+        expired_token = auth_module._encode_jwt(payload)
+
+        response = self.client.get("/api/members/me", HTTP_AUTHORIZATION=f"Bearer {expired_token}")
+
+        self.assertEqual(response.status_code, 401)
+        self.assertEqual(response.json()["code"], 40101)
+
+    def test_member_me_exposes_audit_fields(self):
+        Member.objects.create(
+            openid="member-openid",
+            real_name="李建国",
+            identity_type=Member.IdentityType.COURIER,
+            audit_status=Member.AuditStatus.APPROVED,
+            audit_remark="审核通过",
+        )
+        token, _ = issue_token(subject_type="member", openid="member-openid")
+
+        response = self.client.get("/api/members/me", HTTP_AUTHORIZATION=f"Bearer {token}")
+
+        self.assertEqual(response.status_code, 200)
+        data = response.json()["data"]
+        self.assertEqual(data["real_name"], "李建国")
+        self.assertEqual(data["identity_type"], "courier")
+        self.assertEqual(data["audit_status"], "approved")
+        self.assertEqual(data["audit_remark"], "审核通过")
 
     def test_member_profile_updates_current_member(self):
         Member.objects.create(openid="member-openid")
@@ -111,8 +250,8 @@ class AuthApiTests(TestCase):
 
         response = self.client.get("/api/merchant/me", HTTP_AUTHORIZATION=f"Bearer {token}")
 
-        self.assertEqual(response.status_code, 401)
-        self.assertEqual(response.json()["code"], 40001)
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.json()["code"], 40301)
 
     def test_disabled_merchant_returns_403(self):
         Merchant.objects.create(openid="merchant-openid", name="测试商户", is_active=False)
@@ -121,8 +260,9 @@ class AuthApiTests(TestCase):
         response = self.client.get("/api/merchant/me", HTTP_AUTHORIZATION=f"Bearer {token}")
 
         self.assertEqual(response.status_code, 403)
-        self.assertEqual(response.json()["code"], 40002)
+        self.assertEqual(response.json()["code"], 40301)
 
+    @override_settings(WECHAT_MINIAPP_APPID="", WECHAT_MINIAPP_SECRET="")
     def test_wechat_login_placeholder_reports_missing_config(self):
         response = self.client.post("/api/auth/wechat-login", {"code": "wx-code"}, content_type="application/json")
 

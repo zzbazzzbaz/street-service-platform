@@ -10,7 +10,7 @@ from apps.points.services import add_points
 from shared.exceptions import BusinessError
 
 
-def activity_data(activity: Activity, *, include_checkin_secret: bool = False) -> dict:
+def activity_data(activity: Activity, *, member: Member | None = None, include_checkin_secret: bool = False) -> dict:
     data = {
         "id": activity.id,
         "title": activity.title,
@@ -20,7 +20,24 @@ def activity_data(activity: Activity, *, include_checkin_secret: bool = False) -
         "end_time": activity.end_time,
         "points": activity.points,
         "status": activity.status,
+        "user_signup_id": None,
+        "signup_status": "not_joined",
+        "checkin_status": "not_checked",
+        "point_status": "not_granted",
     }
+    if member is not None:
+        signup = getattr(activity, "_member_signup", None)
+        if signup is None:
+            signup = ActivitySignup.objects.filter(member=member, activity=activity).first()
+        checkin = getattr(activity, "_member_checkin", None)
+        if checkin is None:
+            checkin = ActivityCheckin.objects.filter(member=member, activity=activity).first()
+        if signup is not None:
+            data["user_signup_id"] = signup.id
+            data["signup_status"] = "joined"
+        if checkin is not None:
+            data["checkin_status"] = checkin.status
+            data["point_status"] = "granted" if checkin.point_record_id else "not_granted"
     if include_checkin_secret:
         data["checkin_code"] = activity.checkin_code
         data["checkin_qr_image"] = activity.checkin_qr_image.url if activity.checkin_qr_image else ""

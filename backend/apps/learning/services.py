@@ -10,12 +10,15 @@ from apps.points.services import add_points
 from shared.exceptions import BusinessError
 
 
-def content_data(content: LearningContent, request=None) -> dict:
+def content_data(content: LearningContent, request=None, member: Member | None = None) -> dict:
     from shared.media import file_url
 
     cover_url = file_url(request, content.cover) if request is not None else (content.cover.url if content.cover else "")
     image_url = file_url(request, content.image) if request is not None else (content.image.url if content.image else "")
     video_url = file_url(request, content.video) if request is not None else (content.video.url if content.video else "")
+    record = getattr(content, "_member_record", None)
+    if member is not None and record is None:
+        record = LearningRecord.objects.filter(member=member, content=content).first()
     return {
         "id": content.id,
         "title": content.title,
@@ -28,6 +31,8 @@ def content_data(content: LearningContent, request=None) -> dict:
         "points": content.points,
         "required_seconds": content.required_seconds,
         "is_active": content.is_active,
+        "is_completed": record.is_completed if record is not None else False,
+        "completed_at": record.completed_at if record is not None and record.is_completed else None,
     }
 
 

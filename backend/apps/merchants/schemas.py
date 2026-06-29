@@ -8,6 +8,12 @@ class MerchantWechatLoginIn(Schema):
     code: str = ""
 
 
+class MerchantWechatPhoneLoginIn(Schema):
+    login_code: str = ""
+    phone_code: str = ""
+    platform: str = "merchant_mp"
+
+
 class MerchantOut(Schema):
     id: int
     openid: str
@@ -88,6 +94,30 @@ class MerchantPointRecordOut(Schema):
 
 class MerchantPointRecordsData(Schema):
     items: list[MerchantPointRecordOut]
+    summary: dict | None = None
+    total: int
+    page: int
+    page_size: int
+
+
+class MerchantSettlementOut(Schema):
+    id: int
+    period_type: str
+    period_label: str
+    date_from: str
+    date_to: str
+    record_count: int
+    total_points: int
+    total_yuan_amount: str
+    status: str
+    processed_at: datetime | None = None
+    processor_name: str
+    remark: str
+    created_at: datetime
+
+
+class MerchantSettlementsData(Schema):
+    items: list[MerchantSettlementOut]
     total: int
     page: int
     page_size: int

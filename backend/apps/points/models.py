@@ -25,6 +25,7 @@ class PointRecord(models.Model):
         REPORT = "report", "随手拍"
         ACTIVITY = "activity", "活动"
         ELDER_SERVICE = "elder_service", "老人服务"
+        CIVIC_FEEDBACK = "civic_feedback", "社情民意"
         MANUAL = "manual", "人工"
         MERCHANT_PAYMENT = "merchant_payment", "商户积分支付"
 

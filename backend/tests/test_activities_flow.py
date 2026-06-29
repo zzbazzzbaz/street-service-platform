@@ -82,7 +82,13 @@ class ActivitiesFlowTests(TestCase):
 
         self.assertEqual(list_response.status_code, 200)
         self.assertEqual(detail_response.status_code, 200)
-        self.assertNotIn("checkin_code", list_response.json()["data"]["items"][0])
+        list_item = list_response.json()["data"]["items"][0]
+        self.assertNotIn("checkin_code", list_item)
+        self.assertNotIn("checkin_qr_image", list_item)
+        self.assertIsNone(list_item["user_signup_id"])
+        self.assertEqual(list_item["signup_status"], "not_joined")
+        self.assertEqual(list_item["checkin_status"], "not_checked")
+        self.assertEqual(list_item["point_status"], "not_granted")
         self.assertNotIn("checkin_qr_image", detail_response.json()["data"])
         self.assertEqual(signup_response.status_code, 200)
         self.assertEqual(checkin_response.status_code, 200)
@@ -98,6 +104,12 @@ class ActivitiesFlowTests(TestCase):
         self.assertEqual(signup_item["point_status"], "not_granted")
         self.assertIsNone(signup_item["point_record_id"])
         self.assertEqual(ActivityCheckin.objects.count(), 1)
+
+        joined_list = self.client.get("/api/activities", **headers).json()["data"]["items"][0]
+        self.assertEqual(joined_list["user_signup_id"], signup_response.json()["data"]["id"])
+        self.assertEqual(joined_list["signup_status"], "joined")
+        self.assertEqual(joined_list["checkin_status"], "pending")
+        self.assertEqual(joined_list["point_status"], "not_granted")
 
     def test_activity_api_cancel_signup_before_checkin(self):
         signup_activity(self.member, self.activity)

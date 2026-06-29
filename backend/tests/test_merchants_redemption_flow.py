@@ -1,7 +1,9 @@
 from decimal import Decimal
 
 from django.test import TestCase
+from django.utils import timezone
 
+from apps.merchants.models import MerchantSettlement
 from apps.merchants.services import fixed_code_data, merchant_payment_info, merchant_point_record_data, pay_merchant_with_points
 from apps.points.models import PointAccount, PointExchangeRule, PointRecord
 from apps.points.services import add_points
@@ -104,6 +106,49 @@ class MerchantPointPaymentFlowTests(TestCase):
         items = response.json()["data"]["items"]
         self.assertEqual([item["id"] for item in items], [own_record.id])
 
+    def test_merchant_point_records_support_month_filter_and_filtered_summary(self):
+        add_points(self.member, 500, source_type=PointRecord.SourceType.MANUAL, reason="测试加分")
+        june_first = pay_merchant_with_points(self.member, self.merchant, 100, request_no="june-first")
+        june_second = pay_merchant_with_points(self.member, self.merchant, 200, request_no="june-second")
+        may_record = pay_merchant_with_points(self.member, self.merchant, 100, request_no="may")
+        other_record = pay_merchant_with_points(self.member, self.other_merchant, 100, request_no="other")
+        PointRecord.objects.filter(pk__in=[june_first.pk, june_second.pk]).update(created_at=timezone.datetime(2026, 6, 10, tzinfo=timezone.get_current_timezone()))
+        PointRecord.objects.filter(pk=may_record.pk).update(created_at=timezone.datetime(2026, 5, 10, tzinfo=timezone.get_current_timezone()))
+        PointRecord.objects.filter(pk=other_record.pk).update(created_at=timezone.datetime(2026, 6, 10, tzinfo=timezone.get_current_timezone()))
+
+        response = self.client.get(
+            "/api/merchant/point-records",
+            {"month": "2026-06", "page_size": 1},
+            **auth_header("merchant", self.merchant.openid),
+        )
+
+        self.assertEqual(response.status_code, 200)
+        data = response.json()["data"]
+        self.assertEqual(data["total"], 2)
+        self.assertEqual(len(data["items"]), 1)
+        self.assertEqual(data["summary"]["record_count"], 2)
+        self.assertEqual(data["summary"]["total_points"], 300)
+        self.assertEqual(data["summary"]["total_yuan_amount"], "3.00")
+
+    def test_merchant_point_records_support_date_range_filter(self):
+        add_points(self.member, 300, source_type=PointRecord.SourceType.MANUAL, reason="测试加分")
+        inside = pay_merchant_with_points(self.member, self.merchant, 100, request_no="inside")
+        outside = pay_merchant_with_points(self.member, self.merchant, 100, request_no="outside")
+        PointRecord.objects.filter(pk=inside.pk).update(created_at=timezone.datetime(2026, 6, 15, tzinfo=timezone.get_current_timezone()))
+        PointRecord.objects.filter(pk=outside.pk).update(created_at=timezone.datetime(2026, 6, 20, tzinfo=timezone.get_current_timezone()))
+
+        response = self.client.get(
+            "/api/merchant/point-records",
+            {"date_from": "2026-06-15", "date_to": "2026-06-15"},
+            **auth_header("merchant", self.merchant.openid),
+        )
+
+        self.assertEqual(response.status_code, 200)
+        data = response.json()["data"]
+        self.assertEqual(data["total"], 1)
+        self.assertEqual(data["items"][0]["id"], inside.id)
+        self.assertEqual(data["summary"]["total_points"], 100)
+
     def test_openapi_does_not_publish_old_mall_routes(self):
         response = self.client.get("/api/openapi.json")
 
@@ -121,3 +166,57 @@ class MerchantPointPaymentFlowTests(TestCase):
 
         self.assertEqual(data["member_name_masked"], "测*")
         self.assertEqual(data["member_phone_masked"], "138****0000")
+
+
+class MerchantSettlementsApiTests(TestCase):
+    def setUp(self):
+        self.merchant = create_merchant()
+        self.other_merchant = create_merchant(openid="other-merchant", name="其他商户")
+
+    def test_merchant_can_query_own_settlements_by_year_and_status(self):
+        mine = MerchantSettlement.objects.create(
+            merchant=self.merchant,
+            period_type=MerchantSettlement.PeriodType.MONTH,
+            period_label="2026-06",
+            date_from=timezone.datetime(2026, 6, 1).date(),
+            date_to=timezone.datetime(2026, 6, 30).date(),
+            record_count=2,
+            total_points=300,
+            total_yuan_amount=Decimal("3.00"),
+            status=MerchantSettlement.Status.PROCESSED,
+            processor_name="管理员",
+        )
+        MerchantSettlement.objects.create(
+            merchant=self.merchant,
+            period_type=MerchantSettlement.PeriodType.MONTH,
+            period_label="2025-12",
+            date_from=timezone.datetime(2025, 12, 1).date(),
+            date_to=timezone.datetime(2025, 12, 31).date(),
+            record_count=1,
+            total_points=100,
+            total_yuan_amount=Decimal("1.00"),
+        )
+        MerchantSettlement.objects.create(
+            merchant=self.other_merchant,
+            period_type=MerchantSettlement.PeriodType.MONTH,
+            period_label="2026-06",
+            date_from=timezone.datetime(2026, 6, 1).date(),
+            date_to=timezone.datetime(2026, 6, 30).date(),
+            record_count=1,
+            total_points=100,
+            total_yuan_amount=Decimal("1.00"),
+            status=MerchantSettlement.Status.PROCESSED,
+        )
+
+        response = self.client.get(
+            "/api/merchant/settlements",
+            {"year": 2026, "status": "processed"},
+            **auth_header("merchant", self.merchant.openid),
+        )
+
+        self.assertEqual(response.status_code, 200)
+        data = response.json()["data"]
+        self.assertEqual(data["total"], 1)
+        self.assertEqual(data["items"][0]["id"], mine.id)
+        self.assertEqual(data["items"][0]["period_label"], "2026-06")
+        self.assertEqual(data["items"][0]["total_yuan_amount"], "3.00")

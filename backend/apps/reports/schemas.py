@@ -4,18 +4,19 @@ from ninja import Schema
 
 
 class ReportIn(Schema):
-    title: str
+    category_code: str = ""
     description: str = ""
-    image: str = ""
-    location: str = ""
+    location: str
+    image_urls: list[str] = []
 
 
 class ReportOut(Schema):
     id: int
+    category_code: str
     title: str
     description: str
-    image: str
     location: str
+    image_urls: list[str]
     points: int
     status: str
     review_comment: str

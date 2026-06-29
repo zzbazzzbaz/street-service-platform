@@ -7,8 +7,8 @@ from shared.admin import BackendManagerAdminMixin, admin_image_preview
 
 @admin.register(Report)
 class ReportAdmin(BackendManagerAdminMixin):
-    list_display = ("id", "member", "title", "location", "status", "points", "created_at")
-    list_filter = ("status", "created_at")
+    list_display = ("id", "member", "category_code", "title", "location", "status", "points", "created_at")
+    list_filter = ("category_code", "status", "created_at")
     search_fields = ("member__openid", "member__nickname", "title", "location")
     readonly_fields = ("image_preview", "point_record", "created_at", "updated_at")
 

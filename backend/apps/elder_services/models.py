@@ -1,6 +1,25 @@
 from django.db import models
 
 
+class ElderCareRelation(models.Model):
+    member = models.ForeignKey("members.Member", on_delete=models.CASCADE, related_name="elder_care_relations", verbose_name="小哥")
+    elder_name = models.CharField("老人称呼", max_length=80)
+    elder_address = models.CharField("老人地址", max_length=255)
+    frequency = models.CharField("服务频次", max_length=80, blank=True)
+    is_active = models.BooleanField("是否有效", default=True)
+    created_at = models.DateTimeField("创建时间", auto_now_add=True)
+    updated_at = models.DateTimeField("更新时间", auto_now=True)
+
+    class Meta:
+        db_table = "elder_care_relation"
+        verbose_name = "小哥-老人关系"
+        verbose_name_plural = "小哥-老人关系"
+        ordering = ("-created_at", "-id")
+
+    def __str__(self) -> str:
+        return f"{self.member} - {self.elder_name}"
+
+
 class ElderServiceTask(models.Model):
     class Status(models.TextChoices):
         DRAFT = "draft", "草稿"
@@ -8,6 +27,14 @@ class ElderServiceTask(models.Model):
         CLOSED = "closed", "已关闭"
 
     title = models.CharField("标题", max_length=120)
+    relation = models.ForeignKey(
+        ElderCareRelation,
+        on_delete=models.PROTECT,
+        related_name="tasks",
+        null=True,
+        blank=True,
+        verbose_name="对口关系",
+    )
     description = models.TextField("描述", blank=True)
     location = models.CharField("地点", max_length=255, blank=True)
     points = models.PositiveIntegerField("积分值", default=0)
@@ -31,9 +58,18 @@ class ElderServiceFeedback(models.Model):
         REJECTED = "rejected", "已驳回"
 
     member = models.ForeignKey("members.Member", on_delete=models.CASCADE, related_name="elder_feedbacks", verbose_name="用户")
+    relation = models.ForeignKey(
+        ElderCareRelation,
+        on_delete=models.PROTECT,
+        related_name="feedbacks",
+        null=True,
+        blank=True,
+        verbose_name="对口关系",
+    )
     task = models.ForeignKey(ElderServiceTask, on_delete=models.CASCADE, related_name="feedbacks", verbose_name="任务")
     content = models.TextField("反馈内容")
     image = models.ImageField("图片", upload_to="elder-services/feedbacks/", blank=True)
+    image_urls = models.JSONField("图片URL列表", default=list, blank=True)
     status = models.CharField("状态", max_length=20, choices=Status.choices, default=Status.PENDING)
     review_comment = models.CharField("审核意见", max_length=255, blank=True)
     point_record = models.ForeignKey(
@@ -51,7 +87,6 @@ class ElderServiceFeedback(models.Model):
         db_table = "elder_service_feedback"
         verbose_name = "老人服务反馈"
         verbose_name_plural = "老人服务反馈"
-        unique_together = (("member", "task"),)
         ordering = ("-created_at", "-id")
 
     def __str__(self) -> str:

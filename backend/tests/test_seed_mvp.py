@@ -4,11 +4,13 @@ from django.core.management import call_command
 from django.test import TestCase
 
 from apps.activities.models import Activity, ActivityCheckin, ActivitySignup
-from apps.elder_services.models import ElderServiceFeedback, ElderServiceTask
+from apps.civic_feedbacks.models import CivicFeedback
+from apps.elder_services.models import ElderCareRelation, ElderServiceFeedback, ElderServiceTask
 from apps.learning.models import LearningContent, LearningRecord
 from apps.members.models import Member
-from apps.merchants.models import Merchant
+from apps.merchants.models import Merchant, MerchantSettlement
 from apps.points.models import PointAccount, PointExchangeRule, PointRecord
+from apps.problem_feedbacks.models import ProblemFeedback
 from apps.reports.models import Report
 
 
@@ -20,15 +22,21 @@ class SeedMvpCommandTests(TestCase):
         merchant = Merchant.objects.get(openid="merchant-openid")
 
         self.assertTrue(member.is_active)
+        self.assertEqual(member.audit_status, Member.AuditStatus.APPROVED)
+        self.assertEqual(member.identity_type, Member.IdentityType.COURIER)
         self.assertTrue(merchant.is_active)
         self.assertGreaterEqual(LearningContent.objects.filter(is_active=True).count(), 2)
         self.assertTrue(LearningRecord.objects.filter(member=member, is_completed=True).exists())
         self.assertTrue(Activity.objects.filter(status=Activity.Status.PUBLISHED).exists())
         self.assertTrue(ActivitySignup.objects.filter(member=member).exists())
         self.assertTrue(ActivityCheckin.objects.filter(member=member, status=ActivityCheckin.Status.PENDING).exists())
+        self.assertTrue(ElderCareRelation.objects.filter(member=member, is_active=True).exists())
         self.assertTrue(ElderServiceTask.objects.filter(status=ElderServiceTask.Status.PUBLISHED).exists())
         self.assertTrue(ElderServiceFeedback.objects.filter(member=member, status=ElderServiceFeedback.Status.PENDING).exists())
-        self.assertTrue(Report.objects.filter(member=member, status=Report.Status.PENDING).exists())
+        self.assertTrue(Report.objects.filter(member=member, status=Report.Status.PENDING, image_urls__0__isnull=False).exists())
+        self.assertTrue(CivicFeedback.objects.filter(member=member, status=CivicFeedback.Status.SUBMITTED).exists())
+        self.assertTrue(ProblemFeedback.objects.filter(member=member, status=ProblemFeedback.Status.SUBMITTED).exists())
+        self.assertTrue(MerchantSettlement.objects.filter(merchant=merchant).exists())
         self.assertTrue(PointExchangeRule.objects.filter(points_per_yuan=100, is_active=True).exists())
         self.assertTrue(
             PointRecord.objects.filter(
@@ -52,8 +60,12 @@ class SeedMvpCommandTests(TestCase):
             "signups": ActivitySignup.objects.count(),
             "checkins": ActivityCheckin.objects.count(),
             "tasks": ElderServiceTask.objects.count(),
+            "relations": ElderCareRelation.objects.count(),
             "feedbacks": ElderServiceFeedback.objects.count(),
             "reports": Report.objects.count(),
+            "civic_feedbacks": CivicFeedback.objects.count(),
+            "problem_feedbacks": ProblemFeedback.objects.count(),
+            "merchant_settlements": MerchantSettlement.objects.count(),
             "exchange_rules": PointExchangeRule.objects.count(),
             "merchant_payments": PointRecord.objects.filter(source_type=PointRecord.SourceType.MERCHANT_PAYMENT).count(),
             "point_records": PointRecord.objects.count(),
@@ -71,8 +83,12 @@ class SeedMvpCommandTests(TestCase):
             "signups": ActivitySignup.objects.count(),
             "checkins": ActivityCheckin.objects.count(),
             "tasks": ElderServiceTask.objects.count(),
+            "relations": ElderCareRelation.objects.count(),
             "feedbacks": ElderServiceFeedback.objects.count(),
             "reports": Report.objects.count(),
+            "civic_feedbacks": CivicFeedback.objects.count(),
+            "problem_feedbacks": ProblemFeedback.objects.count(),
+            "merchant_settlements": MerchantSettlement.objects.count(),
             "exchange_rules": PointExchangeRule.objects.count(),
             "merchant_payments": PointRecord.objects.filter(source_type=PointRecord.SourceType.MERCHANT_PAYMENT).count(),
             "point_records": PointRecord.objects.count(),

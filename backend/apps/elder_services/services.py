@@ -21,13 +21,16 @@ def task_data(task: ElderServiceTask) -> dict:
 
 
 def feedback_data(feedback: ElderServiceFeedback, request=None) -> dict:
-    from shared.media import file_url
-
+    task = feedback.task
+    relation = feedback.relation or task.relation
     return {
         "id": feedback.id,
         "task_id": feedback.task_id,
+        "task_title": task.title,
+        "elder_name": relation.elder_name if relation else "",
         "content": feedback.content,
-        "image": file_url(request, feedback.image) if request is not None else (feedback.image.url if feedback.image else ""),
+        "image_urls": feedback.image_urls,
+        "points": task.points,
         "status": feedback.status,
         "review_comment": feedback.review_comment,
         "point_record_id": feedback.point_record_id,
@@ -35,15 +38,63 @@ def feedback_data(feedback: ElderServiceFeedback, request=None) -> dict:
     }
 
 
-def submit_feedback(member: Member, task: ElderServiceTask, *, content: str, image: str = "") -> ElderServiceFeedback:
+def latest_feedback_for(member: Member, task: ElderServiceTask) -> ElderServiceFeedback | None:
+    return ElderServiceFeedback.objects.filter(member=member, task=task).order_by("-created_at", "-id").first()
+
+
+def latest_feedback_data(feedback: ElderServiceFeedback | None) -> dict | None:
+    if feedback is None:
+        return None
+    return {
+        "id": feedback.id,
+        "status": feedback.status,
+        "review_comment": feedback.review_comment,
+        "point_record_id": feedback.point_record_id,
+        "created_at": feedback.created_at,
+    }
+
+
+def my_task_data(task: ElderServiceTask, member: Member) -> dict:
+    latest = getattr(task, "_latest_feedback", None)
+    if latest is None:
+        latest = latest_feedback_for(member, task)
+    relation = task.relation
+    feedback_status = latest.status if latest is not None else "none"
+    return {
+        "task_id": task.id,
+        "title": task.title,
+        "description": task.description,
+        "elder_name": relation.elder_name if relation else "",
+        "elder_address": relation.elder_address if relation else "",
+        "frequency": relation.frequency if relation else "",
+        "points": task.points,
+        "feedback_status": feedback_status,
+        "latest_feedback": latest_feedback_data(latest),
+    }
+
+
+def submit_feedback(member: Member, task: ElderServiceTask, *, content: str, image_urls: list[str] | None = None, image: str = "") -> ElderServiceFeedback:
     if task.status != ElderServiceTask.Status.PUBLISHED:
         raise BusinessError("老人服务任务未发布")
-    if ElderServiceFeedback.objects.filter(member=member, task=task).exists():
+    if task.relation_id and (task.relation.member_id != member.id or not task.relation.is_active):
+        raise BusinessError("老人服务任务不存在", code=40400, status=404)
+    latest = latest_feedback_for(member, task)
+    if latest is not None and latest.status in {ElderServiceFeedback.Status.PENDING, ElderServiceFeedback.Status.APPROVED}:
         raise BusinessError("同一任务不能重复提交反馈")
     content = content.strip()
     if not content:
         raise BusinessError("反馈内容不能为空")
-    return ElderServiceFeedback.objects.create(member=member, task=task, content=content, image=image.strip())
+    image_urls = [str(url).strip() for url in (image_urls or []) if str(url).strip()]
+    if len(image_urls) > 10:
+        raise BusinessError("反馈图片最多 10 张")
+    return ElderServiceFeedback.objects.create(
+        member=member,
+        relation=task.relation,
+        task=task,
+        content=content,
+        image=image.strip(),
+        image_urls=image_urls,
+    )
 
 
 @transaction.atomic

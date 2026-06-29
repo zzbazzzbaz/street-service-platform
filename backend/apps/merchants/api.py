@@ -10,7 +10,9 @@ from apps.merchants.schemas import (
     MerchantPointPaymentIn,
     MerchantPointPaymentOut,
     MerchantPointRecordsData,
+    MerchantSettlementsData,
     MerchantWechatLoginIn,
+    MerchantWechatPhoneLoginIn,
     PublicMerchantsData,
 )
 from apps.merchants.services import (
@@ -18,13 +20,17 @@ from apps.merchants.services import (
     merchant_data,
     merchant_payment_info,
     merchant_point_record_data,
+    merchant_point_records_queryset,
+    merchant_point_records_summary,
     payment_record_data,
     pay_merchant_with_points,
     public_merchant_data,
+    settlement_data,
     test_login,
     wechat_login_placeholder,
+    wechat_phone_login as merchant_wechat_phone_login_service,
 )
-from apps.points.models import PointRecord
+from apps.merchants.models import MerchantSettlement
 from shared.api import ErrorResponse, SuccessResponse, error_response, success_response
 from shared.auth import TokenError
 from shared.exceptions import BusinessError
@@ -43,6 +49,14 @@ def merchant_wechat_login(request, payload: MerchantWechatLoginIn):
         if payload.openid.strip():
             return success_response(test_login(payload.openid))
         return success_response(wechat_login_placeholder(payload.code))
+    except BusinessError as exc:
+        return error_response(exc.code, exc.message, status=exc.status, errors=exc.errors)
+
+
+@merchant_auth_router.post("/wechat-phone-login", response={200: SuccessResponse[MerchantLoginOut], 400: ErrorResponse})
+def merchant_wechat_phone_login(request, payload: MerchantWechatPhoneLoginIn):
+    try:
+        return success_response(merchant_wechat_phone_login_service(payload.login_code, payload.phone_code))
     except BusinessError as exc:
         return error_response(exc.code, exc.message, status=exc.status, errors=exc.errors)
 
@@ -69,20 +83,35 @@ def merchant_fixed_code(request):
     return success_response(fixed_code_data(merchant))
 
 
-@merchant_router.get("/point-records", response={200: SuccessResponse[MerchantPointRecordsData], 401: ErrorResponse, 403: ErrorResponse})
-def merchant_point_records(request, page: int = 1, page_size: int = 20):
+@merchant_router.get("/point-records", response={200: SuccessResponse[MerchantPointRecordsData], 400: ErrorResponse, 401: ErrorResponse, 403: ErrorResponse})
+def merchant_point_records(request, page: int = 1, page_size: int = 20, date_from: str = "", date_to: str = "", month: str = ""):
+    try:
+        merchant = authenticate_merchant(request)
+        queryset = merchant_point_records_queryset(merchant, date_from=date_from, date_to=date_to, month=month)
+        summary = merchant_point_records_summary(queryset)
+    except TokenError as exc:
+        return error_response(40001, str(exc), status=401)
+    except BusinessError as exc:
+        return error_response(exc.code, exc.message, status=exc.status, errors=exc.errors)
+    items, page_data = paginate_queryset(queryset, page=page, page_size=page_size)
+    return success_response({"items": [merchant_point_record_data(item) for item in items], "summary": summary, **page_data})
+
+
+@merchant_router.get("/settlements", response={200: SuccessResponse[MerchantSettlementsData], 401: ErrorResponse, 403: ErrorResponse})
+def merchant_settlements(request, page: int = 1, page_size: int = 20, year: int | None = None, status: str = ""):
     try:
         merchant = authenticate_merchant(request)
     except TokenError as exc:
         return error_response(40001, str(exc), status=401)
     except BusinessError as exc:
         return error_response(exc.code, exc.message, status=exc.status, errors=exc.errors)
-    queryset = PointRecord.objects.filter(
-        merchant=merchant,
-        source_type=PointRecord.SourceType.MERCHANT_PAYMENT,
-    ).select_related("merchant", "member")
+    queryset = MerchantSettlement.objects.filter(merchant=merchant)
+    if year:
+        queryset = queryset.filter(date_from__year=year)
+    if status:
+        queryset = queryset.filter(status=status)
     items, page_data = paginate_queryset(queryset, page=page, page_size=page_size)
-    return success_response({"items": [merchant_point_record_data(item) for item in items], **page_data})
+    return success_response({"items": [settlement_data(item) for item in items], **page_data})
 
 
 @public_merchant_router.get("", response={200: SuccessResponse[PublicMerchantsData], 401: ErrorResponse, 403: ErrorResponse})

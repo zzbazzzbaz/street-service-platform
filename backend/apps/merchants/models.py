@@ -18,3 +18,37 @@ class Merchant(models.Model):
 
     def __str__(self) -> str:
         return self.name
+
+
+class MerchantSettlement(models.Model):
+    class PeriodType(models.TextChoices):
+        MONTH = "month", "自然月"
+        CUSTOM = "custom", "自定义"
+
+    class Status(models.TextChoices):
+        PENDING = "pending", "待处理"
+        PROCESSED = "processed", "已处理"
+
+    merchant = models.ForeignKey(Merchant, on_delete=models.CASCADE, related_name="settlements", verbose_name="商户")
+    period_type = models.CharField("周期类型", max_length=20, choices=PeriodType.choices)
+    period_label = models.CharField("周期标签", max_length=32)
+    date_from = models.DateField("开始日期")
+    date_to = models.DateField("结束日期")
+    record_count = models.PositiveIntegerField("流水数", default=0)
+    total_points = models.PositiveIntegerField("总积分", default=0)
+    total_yuan_amount = models.DecimalField("总金额", max_digits=12, decimal_places=2, default=0)
+    status = models.CharField("状态", max_length=20, choices=Status.choices, default=Status.PENDING)
+    processed_at = models.DateTimeField("处理时间", null=True, blank=True)
+    processor_name = models.CharField("处理人", max_length=80, blank=True)
+    remark = models.TextField("备注", blank=True)
+    created_at = models.DateTimeField("创建时间", auto_now_add=True)
+    updated_at = models.DateTimeField("更新时间", auto_now=True)
+
+    class Meta:
+        db_table = "merchant_settlement"
+        verbose_name = "商户结算记录"
+        verbose_name_plural = "商户结算记录"
+        ordering = ("-date_from", "-id")
+
+    def __str__(self) -> str:
+        return f"{self.merchant} {self.period_label}"

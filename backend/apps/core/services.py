@@ -12,7 +12,15 @@ from shared.media import media_url
 
 
 ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/webp"}
-ALLOWED_BUSINESS_TYPES = {"report", "elder_service_feedback", "merchant_product", "learning_content", "general"}
+ALLOWED_BUSINESS_TYPES = {
+    "report",
+    "civic_feedback",
+    "problem_feedback",
+    "elder_service_feedback",
+    "merchant_product",
+    "learning_content",
+    "general",
+}
 MAX_IMAGE_SIZE = 10 * 1024 * 1024
 MAX_IMAGE_COUNT = 10
 

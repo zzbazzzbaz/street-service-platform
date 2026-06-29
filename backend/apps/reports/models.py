@@ -2,15 +2,30 @@ from django.db import models
 
 
 class Report(models.Model):
+    class CategoryCode(models.TextChoices):
+        ROAD_LIGHT = "road_light", "路灯损坏"
+        WELL_COVER = "well_cover", "井盖问题"
+        WATER_LEAK = "water_leak", "管道漏水"
+        ROAD_DAMAGE = "road_damage", "道路破损"
+        TREE_FALL = "tree_fall", "树木倒伏"
+        OTHER = "other", "其他"
+
     class Status(models.TextChoices):
         PENDING = "pending", "待审核"
         APPROVED = "approved", "已通过"
         REJECTED = "rejected", "已驳回"
 
     member = models.ForeignKey("members.Member", on_delete=models.CASCADE, related_name="reports", verbose_name="用户")
+    category_code = models.CharField(
+        "分类编码",
+        max_length=32,
+        choices=CategoryCode.choices,
+        default=CategoryCode.OTHER,
+    )
     title = models.CharField("标题", max_length=120)
     description = models.TextField("描述", blank=True)
     image = models.ImageField("图片", upload_to="reports/", blank=True)
+    image_urls = models.JSONField("图片URL列表", default=list, blank=True)
     location = models.CharField("位置", max_length=255, blank=True)
     points = models.PositiveIntegerField("积分值", default=5)
     status = models.CharField("状态", max_length=20, choices=Status.choices, default=Status.PENDING)

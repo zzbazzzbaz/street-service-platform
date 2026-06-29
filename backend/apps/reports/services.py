@@ -10,14 +10,13 @@ from shared.exceptions import BusinessError
 
 
 def report_data(report: Report, request=None) -> dict:
-    from shared.media import file_url
-
     return {
         "id": report.id,
+        "category_code": report.category_code,
         "title": report.title,
         "description": report.description,
-        "image": file_url(request, report.image) if request is not None else (report.image.url if report.image else ""),
         "location": report.location,
+        "image_urls": report.image_urls,
         "points": report.points,
         "status": report.status,
         "review_comment": report.review_comment,
@@ -26,16 +25,31 @@ def report_data(report: Report, request=None) -> dict:
     }
 
 
-def submit_report(member: Member, *, title: str, description: str = "", image: str = "", location: str = "") -> Report:
-    title = title.strip()
-    if not title:
-        raise BusinessError("标题不能为空")
+def submit_report(
+    member: Member,
+    *,
+    category_code: str,
+    description: str = "",
+    location: str,
+    image_urls: list[str],
+) -> Report:
+    category_code = category_code.strip()
+    if category_code not in Report.CategoryCode.values:
+        raise BusinessError("分类编码不支持")
+    location = location.strip()
+    if not location:
+        raise BusinessError("位置不能为空")
+    image_urls = [str(url).strip() for url in image_urls if str(url).strip()]
+    if not image_urls or len(image_urls) > 10:
+        raise BusinessError("图片数量必须为 1-10 张")
+    title = Report.CategoryCode(category_code).label
     return Report.objects.create(
         member=member,
+        category_code=category_code,
         title=title,
         description=description.strip(),
-        image=image.strip(),
-        location=location.strip(),
+        location=location,
+        image_urls=image_urls,
     )
 
 

@@ -3,14 +3,18 @@ from __future__ import annotations
 from decimal import Decimal, ROUND_HALF_UP
 
 from django.conf import settings
+from django.db.models import Sum
 from django.db import transaction
+from django.utils import timezone
 
 from apps.members.models import Member
-from apps.merchants.models import Merchant
+from apps.merchants.models import Merchant, MerchantSettlement
 from apps.points.models import PointExchangeRule, PointRecord
 from apps.points.services import deduct_points, get_or_create_account
 from shared.auth import issue_token
 from shared.exceptions import BusinessError
+from shared.wechat import code_to_openid as wechat_code_to_openid
+from shared.wechat import phone_code_to_phone as wechat_phone_code_to_phone
 
 
 def merchant_data(merchant: Merchant) -> dict:
@@ -57,6 +61,29 @@ def wechat_login_placeholder(code: str) -> dict:
     if not settings.WECHAT_MINIAPP_APPID or not settings.WECHAT_MINIAPP_SECRET:
         raise BusinessError("商户微信登录未配置，开发期请使用测试登录", code=40000)
     raise BusinessError("商户微信登录暂未接入", code=40000)
+
+
+def wechat_phone_login(login_code: str, phone_code: str) -> dict:
+    login_code = login_code.strip()
+    phone_code = phone_code.strip()
+    if not phone_code:
+        raise BusinessError("缺少手机号授权 code", code=40000)
+    if not settings.WECHAT_MINIAPP_APPID or not settings.WECHAT_MINIAPP_SECRET:
+        raise BusinessError("商户微信手机号登录未配置", code=40000)
+    openid = wechat_code_to_openid(login_code)
+    phone = wechat_phone_code_to_phone(phone_code)
+    merchant = Merchant.objects.filter(phone=phone, is_active=True).first()
+    if merchant is None:
+        raise BusinessError("商户账号不存在或未启用", code=40301, status=403)
+    merchant.openid = openid
+    merchant.save(update_fields=["openid"])
+    token, expires_in = issue_token(subject_type="merchant", openid=openid)
+    return {
+        "access_token": token,
+        "token_type": "Bearer",
+        "expires_in": expires_in,
+        "merchant": merchant_data(merchant),
+    }
 
 
 def mask_name(value: str) -> str:
@@ -130,6 +157,85 @@ def merchant_point_record_data(record: PointRecord) -> dict:
         }
     )
     return data
+
+
+def merchant_point_records_queryset(merchant: Merchant, *, date_from: str = "", date_to: str = "", month: str = ""):
+    queryset = PointRecord.objects.filter(
+        merchant=merchant,
+        source_type=PointRecord.SourceType.MERCHANT_PAYMENT,
+    ).select_related("merchant", "member")
+    start, end = _parse_record_filter_range(date_from=date_from, date_to=date_to, month=month)
+    if start is not None:
+        queryset = queryset.filter(created_at__gte=start)
+    if end is not None:
+        queryset = queryset.filter(created_at__lte=end)
+    return queryset
+
+
+def merchant_point_records_summary(queryset) -> dict:
+    aggregate = queryset.aggregate(total_points=Sum("amount"), total_yuan_amount=Sum("yuan_amount"))
+    total_points = abs(int(aggregate["total_points"] or 0))
+    total_yuan_amount = aggregate["total_yuan_amount"] or Decimal("0.00")
+    return {
+        "record_count": queryset.count(),
+        "total_points": total_points,
+        "total_yuan_amount": f"{total_yuan_amount:.2f}",
+    }
+
+
+def settlement_data(settlement: MerchantSettlement) -> dict:
+    return {
+        "id": settlement.id,
+        "period_type": settlement.period_type,
+        "period_label": settlement.period_label,
+        "date_from": settlement.date_from.isoformat(),
+        "date_to": settlement.date_to.isoformat(),
+        "record_count": settlement.record_count,
+        "total_points": settlement.total_points,
+        "total_yuan_amount": f"{settlement.total_yuan_amount:.2f}",
+        "status": settlement.status,
+        "processed_at": settlement.processed_at,
+        "processor_name": settlement.processor_name,
+        "remark": settlement.remark,
+        "created_at": settlement.created_at,
+    }
+
+
+def _parse_record_filter_range(*, date_from: str, date_to: str, month: str):
+    tz = timezone.get_current_timezone()
+    if month:
+        try:
+            year, month_value = [int(part) for part in month.split("-", 1)]
+            start_date = timezone.datetime(year, month_value, 1).date()
+        except (TypeError, ValueError):
+            raise BusinessError("月份格式必须为 YYYY-MM")
+        if month_value == 12:
+            next_month = timezone.datetime(year + 1, 1, 1).date()
+        else:
+            next_month = timezone.datetime(year, month_value + 1, 1).date()
+        return timezone.make_aware(timezone.datetime.combine(start_date, timezone.datetime.min.time()), tz), timezone.make_aware(
+            timezone.datetime.combine(next_month, timezone.datetime.min.time()), tz
+        ) - timezone.timedelta(microseconds=1)
+
+    start = _parse_local_date_start(date_from, tz) if date_from else None
+    end = _parse_local_date_end(date_to, tz) if date_to else None
+    return start, end
+
+
+def _parse_local_date_start(value: str, tz):
+    try:
+        date_value = timezone.datetime.strptime(value, "%Y-%m-%d").date()
+    except ValueError:
+        raise BusinessError("开始日期格式必须为 YYYY-MM-DD")
+    return timezone.make_aware(timezone.datetime.combine(date_value, timezone.datetime.min.time()), tz)
+
+
+def _parse_local_date_end(value: str, tz):
+    try:
+        date_value = timezone.datetime.strptime(value, "%Y-%m-%d").date()
+    except ValueError:
+        raise BusinessError("结束日期格式必须为 YYYY-MM-DD")
+    return timezone.make_aware(timezone.datetime.combine(date_value, timezone.datetime.max.time()), tz)
 
 
 @transaction.atomic

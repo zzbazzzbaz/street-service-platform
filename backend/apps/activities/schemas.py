@@ -12,6 +12,10 @@ class ActivityOut(Schema):
     end_time: datetime
     points: int
     status: str
+    user_signup_id: int | None = None
+    signup_status: str = "not_joined"
+    checkin_status: str = "not_checked"
+    point_status: str = "not_granted"
 
 
 class ActivitiesData(Schema):

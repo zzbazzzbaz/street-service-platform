@@ -70,3 +70,16 @@ class UploadsApiTests(TestCase):
 
         self.assertEqual(response.status_code, 400)
         self.assertIn("请上传图片", response.json()["message"])
+
+    def test_upload_accepts_new_feedback_business_types(self):
+        for business_type in ["civic_feedback", "problem_feedback", "elder_service_feedback"]:
+            with self.subTest(business_type=business_type):
+                response = self.client.post(
+                    "/api/uploads/images",
+                    {"business_type": business_type, "files": [image_file(f"{business_type}.jpg")]},
+                    **auth_header("member", self.member.openid),
+                )
+
+                self.assertEqual(response.status_code, 200)
+                url = response.json()["data"]["files"][0]["url"]
+                self.assertIn(f"/media/uploads/{business_type}/", url)

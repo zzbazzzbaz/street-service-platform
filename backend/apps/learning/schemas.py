@@ -15,6 +15,8 @@ class LearningContentOut(Schema):
     points: int
     required_seconds: int
     is_active: bool
+    is_completed: bool = False
+    completed_at: datetime | None = None
 
 
 class LearningContentsData(Schema):

@@ -8,7 +8,7 @@ from shared.api import ErrorResponse, SuccessResponse, error_response, success_r
 from shared.auth import TokenError
 from shared.exceptions import BusinessError
 from shared.pagination import paginate_queryset
-from shared.services import authenticate_member
+from shared.services import authenticate_member, require_approved_member
 
 
 router = Router(tags=["随手拍"])
@@ -17,13 +17,13 @@ router = Router(tags=["随手拍"])
 @router.post("", response={200: SuccessResponse[ReportOut], 400: ErrorResponse, 401: ErrorResponse, 403: ErrorResponse})
 def create_report(request, payload: ReportIn):
     try:
-        member = authenticate_member(request)
+        member = require_approved_member(request)
         report = submit_report(
             member,
-            title=payload.title,
+            category_code=payload.category_code,
             description=payload.description,
-            image=payload.image,
             location=payload.location,
+            image_urls=payload.image_urls,
         )
     except TokenError as exc:
         return error_response(40001, str(exc), status=401)
@@ -33,14 +33,17 @@ def create_report(request, payload: ReportIn):
 
 
 @router.get("", response={200: SuccessResponse[ReportsData], 401: ErrorResponse, 403: ErrorResponse})
-def my_reports(request, page: int = 1, page_size: int = 20):
+def my_reports(request, page: int = 1, page_size: int = 20, status: str = ""):
     try:
         member = authenticate_member(request)
     except TokenError as exc:
         return error_response(40001, str(exc), status=401)
     except BusinessError as exc:
         return error_response(exc.code, exc.message, status=exc.status, errors=exc.errors)
-    items, page_data = paginate_queryset(member.reports.all(), page=page, page_size=page_size)
+    queryset = member.reports.all()
+    if status:
+        queryset = queryset.filter(status=status)
+    items, page_data = paginate_queryset(queryset, page=page, page_size=page_size)
     return success_response({"items": [report_data(item, request=request) for item in items], **page_data})
 
 
