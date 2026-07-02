@@ -1,6 +1,6 @@
 # 街道服务数字化操作系统
 
-街道服务数字化操作系统后端，面向小程序用户端、商户端和开发阶段 Django Admin。当前仓库重点实现一期 MVP 后端能力，包括用户登录、学习宣传、随手拍、活动报名签到、助老服务、积分、商户固定码和积分支付。
+街道服务数字化操作系统后端，面向小程序用户端、商户端和独立前端后台。当前仓库重点实现一期 MVP 后端能力，包括用户登录、学习宣传、随手拍、活动报名签到、助老服务、积分、商户固定码、积分支付和 `/api/admin/*` 后台管理 API。
 
 ## 技术栈
 
@@ -70,7 +70,8 @@ uv run python manage.py runserver 0.0.0.0:8000
 
 常用入口：
 
-- 后台：`http://127.0.0.1:8000/admin/`
+- 正式后台 API：`http://127.0.0.1:8000/api/admin/*`
+- Django Admin 调试入口：`http://127.0.0.1:8000/admin/`
 - API 文档：`http://127.0.0.1:8000/api/docs`
 - OpenAPI：`http://127.0.0.1:8000/api/openapi.json`
 - 健康检查：`http://127.0.0.1:8000/api/health`
@@ -134,10 +135,13 @@ POST /api/merchant/auth/wechat-login
 
 后台：
 
-1. 通过 Django Admin 管理学习内容、活动、助老任务、商户和积分兑换比例。
-2. 审核随手拍、活动签到和助老反馈。
-3. 通过人工加分入口补发用户积分。
-4. 查看图片、二维码预览和积分流水。
+1. 调用 `POST /api/admin/auth/login` 获取后台管理员 token。
+2. 通过 `/api/admin/admin-users`、`/api/admin/members` 管理后台账号、用户资料和用户审核。
+3. 通过 `/api/admin/learning/*`、`/api/admin/activities/*`、`/api/admin/elder-services/*` 维护内容、活动和助老服务。
+4. 通过 `/api/admin/reports`、`/api/admin/civic-feedbacks`、`/api/admin/problem-feedbacks` 完成审核和回复。
+5. 通过 `/api/admin/points/*`、`/api/admin/merchants/*` 完成积分、人工加分、兑换比例、商户和结算管理。
+
+Django Admin 仍保留作为开发调试和应急排查入口，不作为正式运营后台。
 
 ## 测试
 
@@ -159,7 +163,8 @@ uv run python manage.py test tests.test_seed_mvp -v 2
 详细接口说明见：
 
 ```text
-docs/API接口文档.md
+docs/API接口文档/0-API接口文档.md
+docs/API接口文档/6-后台管理API替代DjangoAdmin接口文档.md
 ```
 
 服务启动后也可以访问：
@@ -173,4 +178,4 @@ docs/API接口文档.md
 
 - 正式微信登录当前只保留请求形态，开发期使用测试 `openid` 登录。
 - SQLite 数据库和媒体文件位于 `backend/data/`，默认不提交到 Git。
-- Django Admin 是开发调试和一期验收入口，不是独立正式管理前端。
+- Django Admin 是开发调试和应急排查入口，不是正式业务管理入口。

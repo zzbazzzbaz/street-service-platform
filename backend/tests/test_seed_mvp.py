@@ -1,5 +1,6 @@
 from io import StringIO
 
+from django.contrib.auth import get_user_model
 from django.core.management import call_command
 from django.test import TestCase
 
@@ -20,10 +21,15 @@ class SeedMvpCommandTests(TestCase):
 
         member = Member.objects.get(openid="test-openid")
         merchant = Merchant.objects.get(openid="merchant-openid")
+        admin = get_user_model().objects.get(username="admin")
 
+        self.assertTrue(admin.is_active)
+        self.assertTrue(admin.is_staff)
+        self.assertTrue(admin.is_backend_manager)
         self.assertTrue(member.is_active)
         self.assertEqual(member.audit_status, Member.AuditStatus.APPROVED)
         self.assertEqual(member.identity_type, Member.IdentityType.COURIER)
+        self.assertTrue(Member.objects.filter(audit_status=Member.AuditStatus.PENDING).exists())
         self.assertTrue(merchant.is_active)
         self.assertGreaterEqual(LearningContent.objects.filter(is_active=True).count(), 2)
         self.assertTrue(LearningRecord.objects.filter(member=member, is_completed=True).exists())

@@ -18,6 +18,8 @@ ALLOWED_BUSINESS_TYPES = {
     "problem_feedback",
     "elder_service_feedback",
     "merchant_product",
+    "merchant",
+    "admin",
     "learning_content",
     "general",
 }

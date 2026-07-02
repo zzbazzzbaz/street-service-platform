@@ -34,6 +34,7 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "tinymce",
     "apps.accounts",
+    "apps.admin_portal",
     "apps.core",
     "apps.members",
     "apps.learning",

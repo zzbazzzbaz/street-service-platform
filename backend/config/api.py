@@ -2,6 +2,8 @@ from ninja import NinjaAPI, Schema
 from ninja.errors import ValidationError
 from django.http import Http404
 
+from apps.admin_portal.api import auth_router as admin_auth_router
+from apps.admin_portal.api import router as admin_router
 from apps.activities.api import router as activities_router
 from apps.core.api import router as uploads_router
 from apps.civic_feedbacks.api import router as civic_feedbacks_router
@@ -39,6 +41,8 @@ def health(request):
 
 
 api.add_router("/auth", auth_router)
+api.add_router("/admin/auth", admin_auth_router)
+api.add_router("/admin", admin_router)
 api.add_router("/uploads", uploads_router)
 api.add_router("/members", members_router)
 api.add_router("/learning", learning_router)

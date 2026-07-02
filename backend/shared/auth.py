@@ -18,8 +18,9 @@ class TokenError(Exception):
 @dataclass(frozen=True)
 class TokenIdentity:
     subject_type: str
-    openid: str
     expires_at: int
+    openid: str = ""
+    user_id: int | None = None
 
 
 def issue_token(*, subject_type: str, openid: str) -> tuple[str, int]:
@@ -41,19 +42,42 @@ def issue_token(*, subject_type: str, openid: str) -> tuple[str, int]:
     return _encode_jwt(payload), expires_in
 
 
+def issue_admin_token(*, user_id: int) -> tuple[str, int]:
+    if not user_id:
+        raise TokenError("用户ID不能为空")
+
+    expires_in = settings.ACCESS_TOKEN_EXPIRES_SECONDS
+    now = int(time.time())
+    payload = {
+        "subject_type": "admin",
+        "user_id": int(user_id),
+        "iat": now,
+        "exp": now + expires_in,
+    }
+    return _encode_jwt(payload), expires_in
+
+
 def parse_token(token: str) -> TokenIdentity:
     payload = _decode_jwt(token)
     subject_type = str(payload.get("subject_type") or "").strip()
     openid = str(payload.get("openid") or "").strip()
+    user_id = payload.get("user_id")
     expires_at = int(payload.get("exp") or 0)
 
-    if subject_type not in {"member", "merchant"}:
+    if subject_type not in {"member", "merchant", "admin"}:
         raise TokenError("token 主体类型不支持")
-    if not openid:
+    if subject_type in {"member", "merchant"} and not openid:
         raise TokenError("token 缺少身份")
+    if subject_type == "admin":
+        try:
+            user_id = int(user_id)
+        except (TypeError, ValueError) as exc:
+            raise TokenError("token 缺少身份") from exc
+        if user_id <= 0:
+            raise TokenError("token 缺少身份")
     if expires_at <= int(time.time()):
         raise TokenError("token 已过期")
-    return TokenIdentity(subject_type=subject_type, openid=openid, expires_at=expires_at)
+    return TokenIdentity(subject_type=subject_type, openid=openid, user_id=user_id, expires_at=expires_at)
 
 
 def get_bearer_token(request) -> str:

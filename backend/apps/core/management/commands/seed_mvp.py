@@ -95,6 +95,19 @@ class Command(BaseCommand):
                 "is_active": True,
             },
         )
+        Member.objects.update_or_create(
+            openid="pending-audit-openid",
+            defaults={
+                "nickname": "待审核小哥",
+                "phone": "13800000002",
+                "real_name": "赵待审",
+                "identity_type": Member.IdentityType.COURIER,
+                "audit_status": Member.AuditStatus.PENDING,
+                "audit_remark": "",
+                "audit_submitted_at": now,
+                "is_active": True,
+            },
+        )
 
         merchant, _ = Merchant.objects.update_or_create(
             openid="merchant-openid",
