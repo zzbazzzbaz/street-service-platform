@@ -32,6 +32,8 @@ from apps.admin_portal.schemas import (
     MemberAuditIn,
     MemberUpdateIn,
     MerchantIn,
+    MerchantPointCodeCreateIn,
+    MerchantPointCodeUpdateIn,
     MerchantUpdateIn,
     PasswordResetIn,
     ProblemFeedbackReplyIn,
@@ -52,8 +54,8 @@ from apps.elder_services.models import ElderCareRelation, ElderServiceFeedback, 
 from apps.learning.models import LearningContent, LearningRecord
 from apps.members.models import Member
 from apps.members.services import member_data
-from apps.merchants.models import Merchant, MerchantSettlement
-from apps.merchants.services import fixed_code_data, merchant_data, settlement_data
+from apps.merchants.models import Merchant, MerchantPointCode, MerchantSettlement
+from apps.merchants.services import fixed_code_data, merchant_data, point_code_data, settlement_data
 from apps.points.models import ManualPointAdjustment, PointAccount, PointExchangeRule, PointRecord
 from apps.points.services import point_record_data
 from apps.problem_feedbacks.models import ProblemFeedback
@@ -944,6 +946,60 @@ def admin_merchant_status(request, merchant_id: int, payload: StatusIn):
         merchant.is_active = payload.is_active
         merchant.save(update_fields=["is_active"])
         return success_response(merchant_data(merchant))
+    except BusinessError as exc:
+        return _business_error(exc)
+
+
+@router.get("/merchants/point-codes", response={200: SuccessResponse[dict], 401: ErrorResponse, 403: ErrorResponse})
+def admin_point_codes(request, merchant_id: int | None = None, is_active: str = "", page: int = 1, page_size: int = 20):
+    try:
+        _admin_or_error(request)
+        return success_response(svc.point_codes_data(merchant_id=merchant_id, is_active=is_active, page=page, page_size=page_size))
+    except BusinessError as exc:
+        return _business_error(exc)
+
+
+@router.post("/merchants/point-codes", response={200: SuccessResponse[dict], 400: ErrorResponse, 401: ErrorResponse, 403: ErrorResponse, 404: ErrorResponse})
+def admin_point_code_create(request, payload: MerchantPointCodeCreateIn):
+    try:
+        _admin_or_error(request)
+        return success_response(point_code_data(svc.create_point_code(payload)))
+    except BusinessError as exc:
+        return _business_error(exc)
+
+
+@router.get("/merchants/point-codes/{code_id}", response={200: SuccessResponse[dict], 401: ErrorResponse, 403: ErrorResponse, 404: ErrorResponse})
+def admin_point_code_detail(request, code_id: int):
+    try:
+        _admin_or_error(request)
+        return success_response(point_code_data(svc.get_or_404(MerchantPointCode, code_id)))
+    except BusinessError as exc:
+        return _business_error(exc)
+
+
+@router.patch("/merchants/point-codes/{code_id}", response={200: SuccessResponse[dict], 400: ErrorResponse, 401: ErrorResponse, 403: ErrorResponse, 404: ErrorResponse})
+def admin_point_code_update(request, code_id: int, payload: MerchantPointCodeUpdateIn):
+    try:
+        _admin_or_error(request)
+        return success_response(point_code_data(svc.update_point_code(code_id, payload)))
+    except BusinessError as exc:
+        return _business_error(exc)
+
+
+@router.post("/merchants/point-codes/{code_id}/status", response={200: SuccessResponse[dict], 400: ErrorResponse, 401: ErrorResponse, 403: ErrorResponse, 404: ErrorResponse})
+def admin_point_code_status(request, code_id: int, payload: StatusIn):
+    try:
+        _admin_or_error(request)
+        return success_response(point_code_data(svc.set_point_code_status(code_id, is_active=payload.is_active)))
+    except BusinessError as exc:
+        return _business_error(exc)
+
+
+@router.delete("/merchants/point-codes/{code_id}", response={200: SuccessResponse[dict], 400: ErrorResponse, 401: ErrorResponse, 403: ErrorResponse, 404: ErrorResponse})
+def admin_point_code_delete(request, code_id: int):
+    try:
+        _admin_or_error(request)
+        return success_response(svc.delete_point_code(code_id))
     except BusinessError as exc:
         return _business_error(exc)
 

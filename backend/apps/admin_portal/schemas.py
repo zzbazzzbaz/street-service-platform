@@ -308,3 +308,15 @@ class SettlementGenerateIn(Schema):
 class SettlementProcessIn(Schema):
     processor_name: str
     remark: str = ""
+
+
+class MerchantPointCodeCreateIn(Schema):
+    merchant_id: int
+    points: int
+    remark: str = ""
+
+
+class MerchantPointCodeUpdateIn(Schema):
+    points: int | None = None
+    remark: str | None = None
+    is_active: bool | None = None

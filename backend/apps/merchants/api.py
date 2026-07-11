@@ -7,6 +7,9 @@ from apps.merchants.schemas import (
     MerchantLoginOut,
     MerchantOut,
     MerchantPaymentInfoOut,
+    MerchantPointCodePreviewOut,
+    MerchantPointCodeScanIn,
+    MerchantPointCodeScanOut,
     MerchantPointPaymentIn,
     MerchantPointPaymentOut,
     MerchantPointRecordsData,
@@ -24,7 +27,9 @@ from apps.merchants.services import (
     merchant_point_records_summary,
     payment_record_data,
     pay_merchant_with_points,
+    point_code_payment_preview,
     public_merchant_data,
+    scan_point_code,
     settlement_data,
     test_login,
     wechat_login_placeholder,
@@ -144,6 +149,29 @@ def public_merchant_point_payment(request, merchant_id: int, payload: MerchantPo
         member = authenticate_member(request)
         merchant = get_object_or_404(Merchant, pk=merchant_id)
         record = pay_merchant_with_points(member, merchant, payload.points, request_no=payload.request_no)
+        return success_response(payment_record_data(record))
+    except TokenError as exc:
+        return error_response(40001, str(exc), status=401)
+    except BusinessError as exc:
+        return error_response(exc.code, exc.message, status=exc.status, errors=exc.errors)
+
+
+@public_merchant_router.get("/point-codes/{code}", response={200: SuccessResponse[MerchantPointCodePreviewOut], 400: ErrorResponse, 401: ErrorResponse, 403: ErrorResponse, 404: ErrorResponse})
+def public_point_code_preview(request, code: str):
+    try:
+        member = authenticate_member(request)
+        return success_response(point_code_payment_preview(member, code))
+    except TokenError as exc:
+        return error_response(40001, str(exc), status=401)
+    except BusinessError as exc:
+        return error_response(exc.code, exc.message, status=exc.status, errors=exc.errors)
+
+
+@public_merchant_router.post("/point-codes/{code}/scan", response={200: SuccessResponse[MerchantPointCodeScanOut], 400: ErrorResponse, 401: ErrorResponse, 403: ErrorResponse, 404: ErrorResponse})
+def public_point_code_scan(request, code: str, payload: MerchantPointCodeScanIn):
+    try:
+        member = authenticate_member(request)
+        record = scan_point_code(member, code, request_no=payload.request_no)
         return success_response(payment_record_data(record))
     except TokenError as exc:
         return error_response(40001, str(exc), status=401)

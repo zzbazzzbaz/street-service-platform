@@ -121,3 +121,41 @@ class MerchantSettlementsData(Schema):
     total: int
     page: int
     page_size: int
+
+
+class MerchantPointCodeOut(Schema):
+    id: int
+    merchant_id: int
+    merchant_name: str
+    points: int
+    code: str
+    code_content: str
+    is_active: bool
+    remark: str
+    created_at: datetime
+    updated_at: datetime
+
+
+class MerchantPointCodePreviewOut(Schema):
+    code: str
+    merchant_id: int
+    merchant_name: str
+    points: int
+    points_per_yuan: int
+    yuan_amount: str
+    balance: int
+
+
+class MerchantPointCodeScanIn(Schema):
+    request_no: str = ""
+
+
+class MerchantPointCodeScanOut(Schema):
+    id: int
+    merchant_id: int
+    merchant_name: str
+    points: int
+    yuan_amount: str
+    balance_after: int
+    request_no: str
+    created_at: datetime

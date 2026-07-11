@@ -6,9 +6,10 @@ from django.conf import settings
 from django.db.models import Sum
 from django.db import transaction
 from django.utils import timezone
+from uuid import uuid4
 
 from apps.members.models import Member
-from apps.merchants.models import Merchant, MerchantSettlement
+from apps.merchants.models import Merchant, MerchantPointCode, MerchantSettlement
 from apps.points.models import PointExchangeRule, PointRecord
 from apps.points.services import deduct_points, get_or_create_account
 from shared.auth import issue_token
@@ -263,6 +264,105 @@ def pay_merchant_with_points(member: Member, merchant: Merchant, points: int, *,
         source_type=PointRecord.SourceType.MERCHANT_PAYMENT,
         source_id=str(merchant.id),
         reason=f"商户积分支付：{merchant.name}",
+        merchant=merchant,
+        yuan_amount=yuan_amount,
+        request_no=request_no,
+    )
+
+
+# ---------------------------------------------------------------------------
+# 商户固定积分码
+# ---------------------------------------------------------------------------
+
+
+def generate_point_code_token() -> str:
+    return uuid4().hex
+
+
+def point_code_content(code: str) -> str:
+    return f"street-service://merchant-point-pay?code={code}"
+
+
+def point_code_data(code: MerchantPointCode) -> dict:
+    return {
+        "id": code.id,
+        "merchant_id": code.merchant_id,
+        "merchant_name": code.merchant.name,
+        "points": code.points,
+        "code": code.code,
+        "code_content": point_code_content(code.code),
+        "is_active": code.is_active,
+        "remark": code.remark,
+        "created_at": code.created_at,
+        "updated_at": code.updated_at,
+    }
+
+
+def get_active_point_code_or_404(code: str) -> MerchantPointCode:
+    code = (code or "").strip()
+    if not code:
+        raise BusinessError("二维码标识不能为空")
+    point_code = (
+        MerchantPointCode.objects.select_related("merchant")
+        .filter(code=code)
+        .first()
+    )
+    if point_code is None:
+        raise BusinessError("固定积分码不存在", status=404, code=40400)
+    if not point_code.is_active:
+        raise BusinessError("固定积分码已停用", status=403, code=40003)
+    return point_code
+
+
+def point_code_payment_preview(member: Member, code: str) -> dict:
+    point_code = get_active_point_code_or_404(code)
+    merchant = point_code.merchant
+    if not merchant.is_active:
+        raise BusinessError("商户已停用", status=403, code=40003)
+    rule = active_exchange_rule()
+    account = get_or_create_account(member)
+    yuan_amount = (Decimal(point_code.points) / Decimal(rule.points_per_yuan)).quantize(
+        Decimal("0.01"), rounding=ROUND_HALF_UP
+    )
+    return {
+        "code": point_code.code,
+        "merchant_id": merchant.id,
+        "merchant_name": merchant.name,
+        "points": point_code.points,
+        "points_per_yuan": rule.points_per_yuan,
+        "yuan_amount": f"{yuan_amount:.2f}",
+        "balance": account.balance,
+    }
+
+
+@transaction.atomic
+def scan_point_code(member: Member, code: str, *, request_no: str = "") -> PointRecord:
+    request_no = request_no.strip()
+    point_code = get_active_point_code_or_404(code)
+    merchant = Merchant.objects.select_for_update().get(pk=point_code.merchant_id)
+    if not merchant.is_active:
+        raise BusinessError("商户已停用", status=403, code=40003)
+    points = point_code.points
+    if points <= 0:
+        raise BusinessError("固定积分值必须大于 0")
+    if request_no:
+        existing = (
+            PointRecord.objects.select_related("merchant", "member")
+            .filter(merchant=merchant, request_no=request_no, source_type=PointRecord.SourceType.MERCHANT_PAYMENT)
+            .first()
+        )
+        if existing is not None:
+            return existing
+    rule = active_exchange_rule()
+    yuan_amount = (Decimal(points) / Decimal(rule.points_per_yuan)).quantize(
+        Decimal("0.01"), rounding=ROUND_HALF_UP
+    )
+    return deduct_points(
+        member,
+        points,
+        source_type=PointRecord.SourceType.MERCHANT_PAYMENT,
+        source_id=str(merchant.id),
+        reason=f"商户固定码支付：{merchant.name}",
         merchant=merchant,
         yuan_amount=yuan_amount,
         request_no=request_no,

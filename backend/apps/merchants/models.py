@@ -52,3 +52,22 @@ class MerchantSettlement(models.Model):
 
     def __str__(self) -> str:
         return f"{self.merchant} {self.period_label}"
+
+
+class MerchantPointCode(models.Model):
+    merchant = models.ForeignKey(Merchant, on_delete=models.CASCADE, related_name="point_codes", verbose_name="商户")
+    points = models.PositiveIntegerField("固定积分")
+    code = models.CharField("二维码标识", max_length=64, unique=True)
+    is_active = models.BooleanField("是否启用", default=True)
+    remark = models.CharField("备注", max_length=255, blank=True)
+    created_at = models.DateTimeField("创建时间", auto_now_add=True)
+    updated_at = models.DateTimeField("更新时间", auto_now=True)
+
+    class Meta:
+        db_table = "merchant_point_code"
+        verbose_name = "商户固定积分码"
+        verbose_name_plural = "商户固定积分码"
+        ordering = ("-created_at", "-id")
+
+    def __str__(self) -> str:
+        return f"{self.merchant} {self.points}积分"

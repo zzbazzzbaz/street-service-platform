@@ -23,8 +23,8 @@ from apps.learning.models import LearningContent, LearningRecord
 from apps.learning.services import content_data, record_data
 from apps.members.models import Member
 from apps.members.services import member_data
-from apps.merchants.models import Merchant, MerchantSettlement
-from apps.merchants.services import fixed_code_data, merchant_data, merchant_point_record_data, merchant_point_records_summary, settlement_data
+from apps.merchants.models import Merchant, MerchantPointCode, MerchantSettlement
+from apps.merchants.services import fixed_code_data, generate_point_code_token, merchant_data, merchant_point_record_data, merchant_point_records_summary, point_code_data, settlement_data
 from apps.points.models import ManualPointAdjustment, PointAccount, PointExchangeRule, PointRecord
 from apps.points.services import get_or_create_account, manual_add_points, point_record_data
 from apps.problem_feedbacks.models import ProblemFeedback
@@ -906,3 +906,59 @@ def process_settlement(settlement_id: int, payload) -> MerchantSettlement:
     settlement.remark = payload.remark.strip()
     settlement.save(update_fields=["status", "processed_at", "processor_name", "remark", "updated_at"])
     return settlement
+
+
+# ---------------------------------------------------------------------------
+# 商户固定积分码管理
+# ---------------------------------------------------------------------------
+
+
+def point_codes_data(*, merchant_id: int | None = None, is_active: str = "", page: int = 1, page_size: int = 20) -> dict:
+    queryset = MerchantPointCode.objects.select_related("merchant")
+    if merchant_id is not None:
+        queryset = queryset.filter(merchant_id=merchant_id)
+    if is_active in {"true", "false"}:
+        queryset = queryset.filter(is_active=is_active == "true")
+    return paginated_data(queryset, point_code_data, page=page, page_size=page_size)
+
+
+def create_point_code(payload) -> MerchantPointCode:
+    merchant = get_or_404(Merchant, payload.merchant_id)
+    if not merchant.is_active:
+        raise BusinessError("商户已停用")
+    if payload.points <= 0:
+        raise BusinessError("固定积分值必须大于 0")
+    return MerchantPointCode.objects.create(
+        merchant=merchant,
+        points=payload.points,
+        code=generate_point_code_token(),
+        is_active=True,
+        remark=payload.remark.strip(),
+    )
+
+
+def update_point_code(code_id: int, payload) -> MerchantPointCode:
+    point_code = get_or_404(MerchantPointCode, code_id)
+    if payload.points is not None:
+        if payload.points <= 0:
+            raise BusinessError("固定积分值必须大于 0")
+        point_code.points = payload.points
+    if payload.remark is not None:
+        point_code.remark = payload.remark.strip()
+    if payload.is_active is not None:
+        point_code.is_active = payload.is_active
+    point_code.save()
+    return point_code
+
+
+def set_point_code_status(code_id: int, *, is_active: bool) -> MerchantPointCode:
+    point_code = get_or_404(MerchantPointCode, code_id)
+    point_code.is_active = is_active
+    point_code.save(update_fields=["is_active"])
+    return point_code
+
+
+def delete_point_code(code_id: int) -> dict:
+    point_code = get_or_404(MerchantPointCode, code_id)
+    point_code.delete()
+    return {"deleted": True}

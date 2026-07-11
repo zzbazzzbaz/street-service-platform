@@ -9,7 +9,8 @@ from apps.civic_feedbacks.models import CivicFeedback
 from apps.elder_services.models import ElderCareRelation, ElderServiceFeedback, ElderServiceTask
 from apps.learning.models import LearningContent, LearningRecord
 from apps.members.models import Member
-from apps.merchants.models import Merchant, MerchantSettlement
+from apps.merchants.models import Merchant, MerchantPointCode, MerchantSettlement
+from apps.merchants.services import generate_point_code_token
 from apps.points.models import PointAccount, PointExchangeRule, PointRecord
 from apps.problem_feedbacks.models import ProblemFeedback
 from apps.reports.models import Report
@@ -288,6 +289,16 @@ class Command(BaseCommand):
                 "status": MerchantSettlement.Status.PENDING,
                 "processor_name": "",
                 "remark": "开发测试结算记录",
+            },
+        )
+
+        MerchantPointCode.objects.update_or_create(
+            merchant=merchant,
+            points=50,
+            defaults={
+                "code": generate_point_code_token(),
+                "is_active": True,
+                "remark": "50积分固定码（开发测试）",
             },
         )
 

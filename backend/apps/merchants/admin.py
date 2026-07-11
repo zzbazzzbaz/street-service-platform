@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from apps.merchants.models import Merchant, MerchantSettlement
+from apps.merchants.models import Merchant, MerchantPointCode, MerchantSettlement
 from shared.admin import BackendManagerAdminMixin
 
 
@@ -10,6 +10,14 @@ class MerchantAdmin(BackendManagerAdminMixin):
     list_filter = ("is_active", "created_at")
     search_fields = ("openid", "name", "contact_name", "phone")
     readonly_fields = ("created_at",)
+
+
+@admin.register(MerchantPointCode)
+class MerchantPointCodeAdmin(BackendManagerAdminMixin):
+    list_display = ("id", "merchant", "points", "code", "is_active", "remark", "created_at")
+    list_filter = ("is_active", "created_at")
+    search_fields = ("merchant__name", "code", "remark")
+    readonly_fields = ("code", "created_at", "updated_at")
 
 
 @admin.register(MerchantSettlement)
