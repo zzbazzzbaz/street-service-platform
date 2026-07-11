@@ -11,6 +11,9 @@ dependencies = [
     "django-tinymce==5.0.0",
     "pillow==11.3.0",
     "qrcode==8.2",
+    "psycopg2-binary>=2.9.10",
+    "django-ratelimit>=4.1",
+    "gunicorn>=23.0.0",
 ]
 
 [tool.uv]
