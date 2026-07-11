@@ -185,7 +185,10 @@ LOGGING = {
 # -----------------------------------------------------------------------------
 # Rate limiting
 # -----------------------------------------------------------------------------
-RATELIMIT_ENABLE = env.bool("RATELIMIT_ENABLE", default=not TESTING)
+if TESTING:
+    RATELIMIT_ENABLE = False
+else:
+    RATELIMIT_ENABLE = env.bool("RATELIMIT_ENABLE", default=True)
 
 
 # -----------------------------------------------------------------------------
