@@ -65,6 +65,7 @@ from apps.reports.models import Report
 from apps.reports.services import report_data, review_report
 from shared.api import ErrorResponse, SuccessResponse, error_response, success_response
 from shared.exceptions import BusinessError
+from shared.ratelimit import user_key
 
 
 router = Router(tags=["后台管理"])
@@ -772,6 +773,7 @@ def admin_manual_adjustments(request, page: int = 1, page_size: int = 20):
 
 
 @router.post("/points/manual-adjustments", response={200: SuccessResponse[dict], 400: ErrorResponse, 401: ErrorResponse, 403: ErrorResponse})
+@ratelimit(key=user_key, rate="20/m", block=True)
 def admin_manual_adjustment_create(request, payload: ManualAdjustmentCreateIn):
     try:
         admin = _admin_or_error(request)

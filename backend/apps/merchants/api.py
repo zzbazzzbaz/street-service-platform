@@ -41,6 +41,7 @@ from shared.api import ErrorResponse, SuccessResponse, error_response, success_r
 from shared.auth import TokenError
 from shared.exceptions import BusinessError
 from shared.pagination import paginate_queryset
+from shared.ratelimit import user_key
 from shared.services import authenticate_member, authenticate_merchant
 
 
@@ -147,6 +148,7 @@ def public_merchant_payment_info(request, merchant_id: int):
 
 
 @public_merchant_router.post("/{merchant_id}/point-payments", response={200: SuccessResponse[MerchantPointPaymentOut], 400: ErrorResponse, 401: ErrorResponse, 403: ErrorResponse, 404: ErrorResponse})
+@ratelimit(key=user_key, rate="20/m", block=True)
 def public_merchant_point_payment(request, merchant_id: int, payload: MerchantPointPaymentIn):
     try:
         member = authenticate_member(request)
@@ -171,6 +173,7 @@ def public_point_code_preview(request, code: str):
 
 
 @public_merchant_router.post("/point-codes/{code}/scan", response={200: SuccessResponse[MerchantPointCodeScanOut], 400: ErrorResponse, 401: ErrorResponse, 403: ErrorResponse, 404: ErrorResponse})
+@ratelimit(key=user_key, rate="20/m", block=True)
 def public_point_code_scan(request, code: str, payload: MerchantPointCodeScanIn):
     try:
         member = authenticate_member(request)
