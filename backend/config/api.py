@@ -19,6 +19,7 @@ from apps.reports.api import router as reports_router
 from shared.api import ErrorResponse, error_response
 from shared.api import SuccessResponse, success_response
 from shared.exceptions import BusinessError
+from django_ratelimit.exceptions import Ratelimited
 
 logger = logging.getLogger("street.api")
 
@@ -50,6 +51,12 @@ def business_errors(request, exc: BusinessError):
         exc.message,
     )
     return error_response(exc.code, exc.message, status=exc.status, errors=exc.errors)
+
+
+@api.exception_handler(Ratelimited)
+def ratelimited_errors(request, exc: Ratelimited):
+    logger.warning("限流触发 path=%s method=%s", request.path, request.method)
+    return error_response(42900, "请求过于频繁，请稍后再试", status=429)
 
 
 @api.exception_handler(Exception)
