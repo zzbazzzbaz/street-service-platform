@@ -1,5 +1,6 @@
 from django.shortcuts import get_object_or_404
 from ninja import Router
+from django_ratelimit.decorators import ratelimit
 
 from apps.merchants.models import Merchant
 from apps.merchants.schemas import (
@@ -49,6 +50,7 @@ merchant_router = Router(tags=["商户"])
 
 
 @merchant_auth_router.post("/wechat-login", response={200: SuccessResponse[MerchantLoginOut], 400: ErrorResponse})
+@ratelimit(key="ip", rate="5/m", block=True)
 def merchant_wechat_login(request, payload: MerchantWechatLoginIn):
     try:
         if payload.openid.strip():
@@ -59,6 +61,7 @@ def merchant_wechat_login(request, payload: MerchantWechatLoginIn):
 
 
 @merchant_auth_router.post("/wechat-phone-login", response={200: SuccessResponse[MerchantLoginOut], 400: ErrorResponse})
+@ratelimit(key="ip", rate="5/m", block=True)
 def merchant_wechat_phone_login(request, payload: MerchantWechatPhoneLoginIn):
     try:
         return success_response(merchant_wechat_phone_login_service(payload.login_code, payload.phone_code))

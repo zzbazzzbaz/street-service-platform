@@ -48,6 +48,7 @@ from apps.admin_portal.schemas import (
     StatusIn,
 )
 from apps.admin_portal import services as svc
+from django_ratelimit.decorators import ratelimit
 from apps.civic_feedbacks.models import CivicFeedback
 from apps.civic_feedbacks.services import civic_feedback_data
 from apps.elder_services.models import ElderCareRelation, ElderServiceFeedback, ElderServiceTask
@@ -79,6 +80,7 @@ def _business_error(exc: BusinessError):
 
 
 @auth_router.post("/login", response={200: SuccessResponse[AdminLoginOut], 400: ErrorResponse, 403: ErrorResponse})
+@ratelimit(key="ip", rate="5/m", block=True)
 def admin_login(request, payload: AdminLoginIn):
     try:
         return success_response(svc.login_admin(payload.username, payload.password))
