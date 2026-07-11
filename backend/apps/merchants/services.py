@@ -7,6 +7,7 @@ from django.db.models import Sum
 from django.db import transaction
 from django.utils import timezone
 from uuid import uuid4
+import logging
 
 from apps.members.models import Member
 from apps.merchants.models import Merchant, MerchantPointCode, MerchantSettlement
@@ -16,6 +17,8 @@ from shared.auth import issue_token
 from shared.exceptions import BusinessError
 from shared.wechat import code_to_openid as wechat_code_to_openid
 from shared.wechat import phone_code_to_phone as wechat_phone_code_to_phone
+
+logger = logging.getLogger("street.merchants")
 
 
 def merchant_data(merchant: Merchant) -> dict:
@@ -255,9 +258,23 @@ def pay_merchant_with_points(member: Member, merchant: Merchant, points: int, *,
             .first()
         )
         if existing is not None:
+            logger.info(
+                "商户支付幂等重放 member=%s merchant=%s request_no=%s record_id=%s",
+                member.id,
+                merchant.id,
+                request_no,
+                existing.id,
+            )
             return existing
     rule = active_exchange_rule()
     yuan_amount = (Decimal(points) / Decimal(rule.points_per_yuan)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    logger.info(
+        "商户积分支付 member=%s merchant=%s points=%d yuan_amount=%s",
+        member.id,
+        merchant.id,
+        points,
+        yuan_amount,
+    )
     return deduct_points(
         member,
         points,
@@ -352,10 +369,26 @@ def scan_point_code(member: Member, code: str, *, request_no: str = "") -> Point
             .first()
         )
         if existing is not None:
+            logger.info(
+                "固定码扫码幂等重放 member=%s merchant=%s code=%s request_no=%s record_id=%s",
+                member.id,
+                merchant.id,
+                point_code.code,
+                request_no,
+                existing.id,
+            )
             return existing
     rule = active_exchange_rule()
     yuan_amount = (Decimal(points) / Decimal(rule.points_per_yuan)).quantize(
         Decimal("0.01"), rounding=ROUND_HALF_UP
+    )
+    logger.info(
+        "固定码扫码支付 member=%s merchant=%s code=%s points=%d yuan_amount=%s",
+        member.id,
+        merchant.id,
+        point_code.code,
+        points,
+        yuan_amount,
     )
     return deduct_points(
         member,

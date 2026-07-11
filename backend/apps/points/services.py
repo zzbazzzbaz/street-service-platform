@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from decimal import Decimal
 
 from django.db import transaction
@@ -7,6 +8,8 @@ from django.db import transaction
 from apps.members.models import Member
 from apps.points.models import PointAccount, PointRecord
 from shared.exceptions import BusinessError
+
+logger = logging.getLogger("street.points")
 
 
 def get_or_create_account(member: Member) -> PointAccount:
@@ -34,7 +37,7 @@ def add_points(
     account = PointAccount.objects.select_for_update().get(member=member)
     account.balance += amount
     account.save(update_fields=["balance"])
-    return PointRecord.objects.create(
+    record = PointRecord.objects.create(
         member=member,
         amount=amount,
         change_type=PointRecord.ChangeType.INCOME,
@@ -44,6 +47,14 @@ def add_points(
         balance_after=account.balance,
         operator=operator,
     )
+    logger.info(
+        "积分增加 member=%s amount=%d source=%s balance_after=%d",
+        member.id,
+        amount,
+        source_type,
+        account.balance,
+    )
+    return record
 
 
 @transaction.atomic
@@ -67,11 +78,18 @@ def deduct_points(
     if not reason.strip():
         raise BusinessError("积分变动原因不能为空")
     if account.balance < amount:
+        logger.warning(
+            "积分扣减失败余额不足 member=%s need=%d balance=%d source=%s",
+            member.id,
+            amount,
+            account.balance,
+            source_type,
+        )
         raise BusinessError("积分余额不足")
 
     account.balance -= amount
     account.save(update_fields=["balance"])
-    return PointRecord.objects.create(
+    record = PointRecord.objects.create(
         member=member,
         amount=-amount,
         change_type=PointRecord.ChangeType.EXPENSE,
@@ -84,6 +102,14 @@ def deduct_points(
         yuan_amount=yuan_amount,
         request_no=request_no.strip(),
     )
+    logger.info(
+        "积分扣减 member=%s amount=%d source=%s balance_after=%d",
+        member.id,
+        amount,
+        source_type,
+        account.balance,
+    )
+    return record
 
 
 def manual_add_points(member: Member, amount: int, *, reason: str, operator) -> PointRecord:

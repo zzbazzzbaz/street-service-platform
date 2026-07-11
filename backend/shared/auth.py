@@ -4,11 +4,14 @@ import base64
 import hashlib
 import hmac
 import json
+import logging
 import time
 from dataclasses import dataclass
 from typing import Any
 
 from django.conf import settings
+
+logger = logging.getLogger("street.auth")
 
 
 class TokenError(Exception):
@@ -58,24 +61,33 @@ def issue_admin_token(*, user_id: int) -> tuple[str, int]:
 
 
 def parse_token(token: str) -> TokenIdentity:
-    payload = _decode_jwt(token)
+    try:
+        payload = _decode_jwt(token)
+    except TokenError:
+        logger.warning("token 解析失败")
+        raise
     subject_type = str(payload.get("subject_type") or "").strip()
     openid = str(payload.get("openid") or "").strip()
     user_id = payload.get("user_id")
     expires_at = int(payload.get("exp") or 0)
 
     if subject_type not in {"member", "merchant", "admin"}:
+        logger.warning("token 主体类型不支持 subject_type=%s", subject_type)
         raise TokenError("token 主体类型不支持")
     if subject_type in {"member", "merchant"} and not openid:
+        logger.warning("token 缺少身份 subject_type=%s", subject_type)
         raise TokenError("token 缺少身份")
     if subject_type == "admin":
         try:
             user_id = int(user_id)
         except (TypeError, ValueError) as exc:
+            logger.warning("token 管理员身份无效")
             raise TokenError("token 缺少身份") from exc
         if user_id <= 0:
+            logger.warning("token 管理员 ID 无效 user_id=%s", user_id)
             raise TokenError("token 缺少身份")
     if expires_at <= int(time.time()):
+        logger.warning("token 已过期 subject_type=%s", subject_type)
         raise TokenError("token 已过期")
     return TokenIdentity(subject_type=subject_type, openid=openid, user_id=user_id, expires_at=expires_at)
 

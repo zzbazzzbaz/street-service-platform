@@ -3,6 +3,7 @@ from __future__ import annotations
 from decimal import Decimal
 from pathlib import Path
 from uuid import uuid4
+import logging
 
 from django.conf import settings
 from django.contrib.auth import authenticate, get_user_model
@@ -35,6 +36,8 @@ from shared.auth import issue_admin_token
 from shared.exceptions import BusinessError
 from shared.media import media_url
 from shared.pagination import paginate_queryset
+
+logger = logging.getLogger("street.admin")
 
 
 User = get_user_model()
@@ -905,6 +908,13 @@ def process_settlement(settlement_id: int, payload) -> MerchantSettlement:
     settlement.processor_name = payload.processor_name.strip()
     settlement.remark = payload.remark.strip()
     settlement.save(update_fields=["status", "processed_at", "processor_name", "remark", "updated_at"])
+    logger.info(
+        "商户结算处理 settlement=%s merchant=%s processor=%s total_points=%s",
+        settlement.id,
+        settlement.merchant_id,
+        settlement.processor_name,
+        settlement.total_points,
+    )
     return settlement
 
 

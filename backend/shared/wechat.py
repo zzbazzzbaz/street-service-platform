@@ -1,11 +1,15 @@
 from __future__ import annotations
 
 import json
+import logging
 from urllib import parse, request
+from urllib.error import URLError
 
 from django.conf import settings
 
 from shared.exceptions import BusinessError
+
+logger = logging.getLogger("street.wechat")
 
 
 def code_to_openid(login_code: str) -> str:
@@ -60,24 +64,35 @@ def _stable_access_token() -> str:
 
 def _get_json(url: str, params: dict) -> dict:
     query = parse.urlencode(params)
-    with request.urlopen(f"{url}?{query}", timeout=8) as response:
-        return _parse_wechat_response(response.read())
+    full_url = f"{url}?{query}"
+    try:
+        with request.urlopen(full_url, timeout=8) as response:
+            return _parse_wechat_response(response.read())
+    except URLError as exc:
+        logger.error("微信接口请求失败 url=%s reason=%s", url, exc.reason)
+        raise BusinessError("微信接口网络请求失败") from exc
 
 
 def _post_json(url: str, payload: dict) -> dict:
     body = json.dumps(payload, ensure_ascii=False).encode()
     req = request.Request(url, data=body, headers={"Content-Type": "application/json"}, method="POST")
-    with request.urlopen(req, timeout=8) as response:
-        return _parse_wechat_response(response.read())
+    try:
+        with request.urlopen(req, timeout=8) as response:
+            return _parse_wechat_response(response.read())
+    except URLError as exc:
+        logger.error("微信接口请求失败 url=%s reason=%s", url, exc.reason)
+        raise BusinessError("微信接口网络请求失败") from exc
 
 
 def _parse_wechat_response(raw: bytes) -> dict:
     try:
         data = json.loads(raw.decode())
     except (UnicodeDecodeError, json.JSONDecodeError):
+        logger.error("微信接口返回非 JSON 原始响应=%s", raw[:500])
         raise BusinessError("微信接口返回异常")
     errcode = data.get("errcode")
     if errcode not in (None, 0):
         errmsg = data.get("errmsg") or "微信接口调用失败"
+        logger.warning("微信接口错误 errcode=%s errmsg=%s", errcode, errmsg)
         raise BusinessError(str(errmsg))
     return data

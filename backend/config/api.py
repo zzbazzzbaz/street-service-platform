@@ -1,3 +1,5 @@
+import logging
+
 from ninja import NinjaAPI, Schema
 from ninja.errors import ValidationError
 from django.http import Http404
@@ -16,6 +18,9 @@ from apps.problem_feedbacks.api import router as problem_feedbacks_router
 from apps.reports.api import router as reports_router
 from shared.api import ErrorResponse, error_response
 from shared.api import SuccessResponse, success_response
+from shared.exceptions import BusinessError
+
+logger = logging.getLogger("street.api")
 
 
 class HealthOut(Schema):
@@ -33,6 +38,24 @@ def validation_errors(request, exc):
 @api.exception_handler(Http404)
 def not_found_errors(request, exc):
     return error_response(40400, "资源不存在", status=404)
+
+
+@api.exception_handler(BusinessError)
+def business_errors(request, exc: BusinessError):
+    logger.warning(
+        "业务异常 path=%s method=%s code=%s message=%s",
+        request.path,
+        request.method,
+        exc.code,
+        exc.message,
+    )
+    return error_response(exc.code, exc.message, status=exc.status, errors=exc.errors)
+
+
+@api.exception_handler(Exception)
+def catch_all(request, exc: Exception):
+    logger.exception("未处理异常 path=%s method=%s", request.path, request.method)
+    return error_response(50000, "服务器内部错误", status=500)
 
 
 @api.get("/health", response=SuccessResponse[HealthOut], tags=["系统"])
