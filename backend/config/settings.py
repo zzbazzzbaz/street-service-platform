@@ -1,6 +1,7 @@
 from pathlib import Path
 
 import environ
+import sys
 
 
 # -----------------------------------------------------------------------------
@@ -10,6 +11,8 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 env = environ.Env()
 env.read_env(BASE_DIR / ".env")
+
+TESTING = "test" in sys.argv
 
 
 # -----------------------------------------------------------------------------
@@ -87,10 +90,32 @@ ASGI_APPLICATION = "config.asgi.application"
 # -----------------------------------------------------------------------------
 DATABASES = {
     "default": {
-        "ENGINE": "django.db.backends.sqlite3",
-        "NAME": BASE_DIR / "data" / "db.sqlite3",
+        "ENGINE": "django.db.backends.postgresql",
+        "NAME": env("DJANGO_DB_NAME", default="street"),
+        "USER": env("DJANGO_DB_USER", default="street"),
+        "PASSWORD": env("DJANGO_DB_PASSWORD", default="street"),
+        "HOST": env("DJANGO_DB_HOST", default="127.0.0.1"),
+        "PORT": env("DJANGO_DB_PORT", default="5432"),
     }
 }
+
+
+# -----------------------------------------------------------------------------
+# Cache
+# -----------------------------------------------------------------------------
+if TESTING:
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+        }
+    }
+else:
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.redis.RedisCache",
+            "LOCATION": env("DJANGO_REDIS_URL", default="redis://127.0.0.1:6379/0"),
+        }
+    }
 
 
 # -----------------------------------------------------------------------------
@@ -155,6 +180,12 @@ LOGGING = {
         "level": "WARNING",
     },
 }
+
+
+# -----------------------------------------------------------------------------
+# Rate limiting
+# -----------------------------------------------------------------------------
+RATELIMIT_ENABLE = env.bool("RATELIMIT_ENABLE", default=not TESTING)
 
 
 # -----------------------------------------------------------------------------
