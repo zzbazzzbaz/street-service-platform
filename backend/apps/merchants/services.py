@@ -352,6 +352,14 @@ def point_code_payment_preview(member: Member, code: str) -> dict:
     }
 
 
+def merchant_point_codes(merchant: Merchant, *, include_inactive: bool = False) -> list[dict]:
+    queryset = MerchantPointCode.objects.filter(merchant=merchant)
+    if not include_inactive:
+        queryset = queryset.filter(is_active=True)
+    queryset = queryset.order_by("points", "-id")
+    return [point_code_data(code) for code in queryset.select_related("merchant")]
+
+
 @transaction.atomic
 def scan_point_code(member: Member, code: str, *, request_no: str = "") -> PointRecord:
     request_no = request_no.strip()

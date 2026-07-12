@@ -11,6 +11,7 @@ from apps.merchants.schemas import (
     MerchantPointCodePreviewOut,
     MerchantPointCodeScanIn,
     MerchantPointCodeScanOut,
+    MerchantPointCodesData,
     MerchantPointPaymentIn,
     MerchantPointPaymentOut,
     MerchantPointRecordsData,
@@ -23,6 +24,7 @@ from apps.merchants.services import (
     fixed_code_data,
     merchant_data,
     merchant_payment_info,
+    merchant_point_codes,
     merchant_point_record_data,
     merchant_point_records_queryset,
     merchant_point_records_summary,
@@ -90,6 +92,23 @@ def merchant_fixed_code(request):
     except BusinessError as exc:
         return error_response(exc.code, exc.message, status=exc.status, errors=exc.errors)
     return success_response(fixed_code_data(merchant))
+
+
+@merchant_router.get("/point-codes", response={200: SuccessResponse[MerchantPointCodesData], 401: ErrorResponse, 403: ErrorResponse})
+def merchant_point_codes_view(request, include_inactive: bool = False):
+    """返回当前登录商户的固定积分码列表，供商户端按积分面额选择并展示二维码。
+
+    允许一个商户启用多个固定积分码（不同面额），商户端可按面额切换展示。
+    默认仅返回启用中的码；传 include_inactive=true 可同时返回停用的码。
+    """
+    try:
+        merchant = authenticate_merchant(request)
+    except TokenError as exc:
+        return error_response(40001, str(exc), status=401)
+    except BusinessError as exc:
+        return error_response(exc.code, exc.message, status=exc.status, errors=exc.errors)
+    items = merchant_point_codes(merchant, include_inactive=include_inactive)
+    return success_response({"items": items})
 
 
 @merchant_router.get("/point-records", response={200: SuccessResponse[MerchantPointRecordsData], 400: ErrorResponse, 401: ErrorResponse, 403: ErrorResponse})

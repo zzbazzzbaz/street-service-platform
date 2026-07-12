@@ -159,3 +159,18 @@ class MerchantPointCodeScanOut(Schema):
     balance_after: int
     request_no: str
     created_at: datetime
+
+
+class MerchantPointCodeItemOut(Schema):
+    id: int
+    points: int
+    code: str
+    code_content: str
+    remark: str
+    is_active: bool
+    created_at: datetime
+    updated_at: datetime
+
+
+class MerchantPointCodesData(Schema):
+    items: list[MerchantPointCodeItemOut]

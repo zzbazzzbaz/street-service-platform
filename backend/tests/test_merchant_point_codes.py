@@ -356,3 +356,74 @@ class AdminMerchantPointCodeApiTests(TestCase):
     def test_admin_apis_require_auth(self):
         response = self.client.get("/api/admin/merchants/point-codes")
         self.assertEqual(response.status_code, 401)
+
+
+class MerchantPortalPointCodeApiTests(TestCase):
+    """商户端 GET /api/merchant/point-codes 接口测试。"""
+
+    def setUp(self):
+        self.merchant = create_merchant()
+        self.other_merchant = create_merchant(openid="other-merchant-openid", name="其他商户")
+        self.active_50 = MerchantPointCode.objects.create(
+            merchant=self.merchant, points=50, code="m-active-50", is_active=True, remark="50积分"
+        )
+        self.active_100 = MerchantPointCode.objects.create(
+            merchant=self.merchant, points=100, code="m-active-100", is_active=True, remark="100积分"
+        )
+        self.inactive = MerchantPointCode.objects.create(
+            merchant=self.merchant, points=200, code="m-inactive", is_active=False, remark="停用码"
+        )
+        MerchantPointCode.objects.create(
+            merchant=self.other_merchant, points=50, code="other-50", is_active=True
+        )
+        self.headers = auth_header("merchant", self.merchant.openid)
+
+    def test_list_returns_only_own_active_codes(self):
+        response = self.client.get("/api/merchant/point-codes", **self.headers)
+
+        self.assertEqual(response.status_code, 200)
+        items = response.json()["data"]["items"]
+        ids = {item["id"] for item in items}
+        self.assertIn(self.active_50.id, ids)
+        self.assertIn(self.active_100.id, ids)
+        self.assertNotIn(self.inactive.id, ids)
+        self.assertEqual(len(items), 2)
+
+    def test_list_sorted_by_points(self):
+        response = self.client.get("/api/merchant/point-codes", **self.headers)
+
+        items = response.json()["data"]["items"]
+        self.assertEqual([item["points"] for item in items], [50, 100])
+
+    def test_list_item_fields_and_code_content(self):
+        response = self.client.get("/api/merchant/point-codes", **self.headers)
+
+        item = response.json()["data"]["items"][0]
+        self.assertEqual(
+            set(item.keys()),
+            {"id", "points", "code", "code_content", "remark", "is_active", "created_at", "updated_at"},
+        )
+        self.assertEqual(item["code"], "m-active-50")
+        self.assertEqual(item["code_content"], "street-service://merchant-point-pay?code=m-active-50")
+        self.assertEqual(item["remark"], "50积分")
+        self.assertTrue(item["is_active"])
+
+    def test_include_inactive_returns_all_own_codes(self):
+        response = self.client.get("/api/merchant/point-codes?include_inactive=true", **self.headers)
+
+        self.assertEqual(response.status_code, 200)
+        items = response.json()["data"]["items"]
+        self.assertEqual(len(items), 3)
+        codes = {item["code"] for item in items}
+        self.assertEqual(codes, {"m-active-50", "m-active-100", "m-inactive"})
+
+    def test_list_isolates_other_merchants(self):
+        response = self.client.get("/api/merchant/point-codes", **self.headers)
+
+        codes = [item["code"] for item in response.json()["data"]["items"]]
+        self.assertNotIn("other-50", codes)
+
+    def test_list_requires_auth(self):
+        response = self.client.get("/api/merchant/point-codes")
+
+        self.assertEqual(response.status_code, 401)
