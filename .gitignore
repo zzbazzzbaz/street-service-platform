@@ -15,3 +15,4 @@ backend/data/staticfiles/
 backend/.env
 
 docs/**/.tmp_ocr/
+docs/_chat/
