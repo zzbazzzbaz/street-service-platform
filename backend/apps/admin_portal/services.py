@@ -36,6 +36,7 @@ from shared.auth import issue_admin_token
 from shared.exceptions import BusinessError
 from shared.media import media_url
 from shared.pagination import paginate_queryset
+from shared.privacy import mask_phone, member_brief
 
 logger = logging.getLogger("street.admin")
 
@@ -255,11 +256,11 @@ def audit_member(member_id: int, *, action: str, remark: str) -> dict:
 def member_points_data(member_id: int) -> dict:
     member = get_or_404(Member, member_id)
     account = get_or_create_account(member)
-    records = PointRecord.objects.filter(member=member).select_related("merchant")[:10]
+    records = PointRecord.objects.filter(member=member).select_related("merchant", "member")[:10]
     return {
         "member": member_data(member),
         "account": {"id": account.id, "balance": account.balance},
-        "records": [point_record_data(record) for record in records],
+        "records": [point_record_admin_data(record) for record in records],
     }
 
 
@@ -365,19 +366,44 @@ def delete_learning_content(content_id: int) -> dict:
 
 def admin_record_data(record: LearningRecord) -> dict:
     data = record_data(record)
-    data.update(
-        {
-            "member_id": record.member_id,
-            "member_name": record.member.nickname,
-            "content_title": record.content.title,
-        }
-    )
+    data.update(member_brief(record.member))
+    data["content_title"] = record.content.title
     return data
 
 
 # ---------------------------------------------------------------------------
 # Review and feedback workflows
 # ---------------------------------------------------------------------------
+
+
+def report_admin_data(report: Report, request=None) -> dict:
+    data = report_data(report, request=request)
+    data.update(member_brief(report.member))
+    return data
+
+
+def civic_feedback_admin_data(feedback: CivicFeedback) -> dict:
+    data = civic_feedback_data(feedback)
+    data.update(member_brief(feedback.member))
+    return data
+
+
+def problem_feedback_admin_data(feedback: ProblemFeedback) -> dict:
+    data = problem_feedback_data(feedback)
+    data.update(member_brief(feedback.member))
+    return data
+
+
+def point_record_admin_data(record: PointRecord) -> dict:
+    data = point_record_data(record)
+    data.update(member_brief(record.member))
+    return data
+
+
+def elder_feedback_admin_data(feedback: ElderServiceFeedback, request=None) -> dict:
+    data = elder_feedback_data(feedback, request=request)
+    data.update(member_brief(feedback.member))
+    return data
 
 
 def reports_data(*, keyword: str = "", category_code: str = "", status: str = "", page: int = 1, page_size: int = 20) -> dict:
@@ -394,7 +420,7 @@ def reports_data(*, keyword: str = "", category_code: str = "", status: str = ""
         queryset = queryset.filter(category_code=category_code)
     if status:
         queryset = queryset.filter(status=status)
-    return paginated_data(queryset, report_data, page=page, page_size=page_size)
+    return paginated_data(queryset, report_admin_data, page=page, page_size=page_size)
 
 
 def update_report(report_id: int, payload) -> dict:
@@ -414,7 +440,7 @@ def update_report(report_id: int, payload) -> dict:
     if payload.image_urls is not None:
         report.image_urls = [str(url).strip() for url in payload.image_urls if str(url).strip()]
     report.save()
-    return report_data(report)
+    return report_admin_data(report)
 
 
 def civic_feedbacks_data(*, keyword: str = "", status: str = "", page: int = 1, page_size: int = 20) -> dict:
@@ -423,7 +449,7 @@ def civic_feedbacks_data(*, keyword: str = "", status: str = "", page: int = 1, 
         queryset = queryset.filter(Q(member__openid__icontains=keyword) | Q(member__nickname__icontains=keyword) | Q(member__real_name__icontains=keyword) | Q(title__icontains=keyword))
     if status:
         queryset = queryset.filter(status=status)
-    return paginated_data(queryset, civic_feedback_data, page=page, page_size=page_size)
+    return paginated_data(queryset, civic_feedback_admin_data, page=page, page_size=page_size)
 
 
 def update_civic_feedback(feedback_id: int, payload) -> dict:
@@ -439,7 +465,7 @@ def update_civic_feedback(feedback_id: int, payload) -> dict:
             raise BusinessError("积分值必须为非负整数")
         feedback.points = payload.points
     feedback.save()
-    return civic_feedback_data(feedback)
+    return civic_feedback_admin_data(feedback)
 
 
 def review_civic_feedback(feedback_id: int, payload, operator) -> dict:
@@ -458,7 +484,7 @@ def review_civic_feedback(feedback_id: int, payload, operator) -> dict:
         feedback = reject_civic_feedback(feedback, reply=payload.reply)
     else:
         raise BusinessError("审核动作不支持")
-    return civic_feedback_data(feedback)
+    return civic_feedback_admin_data(feedback)
 
 
 def problem_feedbacks_data(*, keyword: str = "", status: str = "", page: int = 1, page_size: int = 20) -> dict:
@@ -467,7 +493,7 @@ def problem_feedbacks_data(*, keyword: str = "", status: str = "", page: int = 1
         queryset = queryset.filter(Q(member__openid__icontains=keyword) | Q(member__nickname__icontains=keyword) | Q(title__icontains=keyword))
     if status:
         queryset = queryset.filter(status=status)
-    return paginated_data(queryset, problem_feedback_data, page=page, page_size=page_size)
+    return paginated_data(queryset, problem_feedback_admin_data, page=page, page_size=page_size)
 
 
 def update_problem_feedback(feedback_id: int, payload) -> dict:
@@ -481,7 +507,7 @@ def update_problem_feedback(feedback_id: int, payload) -> dict:
         feedback.refresh_from_db()
     else:
         feedback.save()
-    return problem_feedback_data(feedback)
+    return problem_feedback_admin_data(feedback)
 
 
 def set_problem_feedback_status(feedback_id: int, *, status: str) -> dict:
@@ -492,7 +518,7 @@ def set_problem_feedback_status(feedback_id: int, *, status: str) -> dict:
         raise BusinessError("请先回复问题反馈")
     feedback.status = status
     feedback.save(update_fields=["status", "updated_at"])
-    return problem_feedback_data(feedback)
+    return problem_feedback_admin_data(feedback)
 
 
 # ---------------------------------------------------------------------------
@@ -545,13 +571,14 @@ def delete_activity(activity_id: int) -> dict:
 
 def signup_admin_data(signup: ActivitySignup) -> dict:
     data = signup_data(signup)
-    data.update({"member_id": signup.member_id, "member_name": signup.member.nickname})
+    data.update(member_brief(signup.member))
     return data
 
 
 def checkin_admin_data(checkin: ActivityCheckin) -> dict:
     data = checkin_data(checkin)
-    data.update({"member_id": checkin.member_id, "member_name": checkin.member.nickname, "activity_title": checkin.activity.title})
+    data.update(member_brief(checkin.member))
+    data["activity_title"] = checkin.activity.title
     return data
 
 
@@ -571,8 +598,7 @@ def checkin_code_data(activity: Activity, request=None) -> dict:
 def relation_data(relation: ElderCareRelation) -> dict:
     return {
         "id": relation.id,
-        "member_id": relation.member_id,
-        "member_name": relation.member.nickname,
+        **member_brief(relation.member),
         "elder_name": relation.elder_name,
         "elder_address": relation.elder_address,
         "frequency": relation.frequency,
@@ -624,10 +650,14 @@ def delete_relation(relation_id: int) -> dict:
 
 
 def elder_task_admin_data(task: ElderServiceTask) -> dict:
+    relation = task.relation
+    member = relation.member if relation else None
     return {
         "id": task.id,
         "title": task.title,
         "relation_id": task.relation_id,
+        **member_brief(member),
+        "elder_name": relation.elder_name if relation else "",
         "description": task.description,
         "location": task.location,
         "points": task.points,
@@ -688,7 +718,7 @@ def update_elder_feedback(feedback_id: int, payload) -> dict:
     if payload.image_urls is not None:
         feedback.image_urls = [str(url).strip() for url in payload.image_urls if str(url).strip()]
     feedback.save()
-    return elder_feedback_data(feedback)
+    return elder_feedback_admin_data(feedback)
 
 
 # ---------------------------------------------------------------------------
@@ -699,8 +729,7 @@ def update_elder_feedback(feedback_id: int, payload) -> dict:
 def point_account_data(account: PointAccount) -> dict:
     return {
         "id": account.id,
-        "member_id": account.member_id,
-        "member_name": account.member.nickname,
+        **member_brief(account.member),
         "balance": account.balance,
     }
 
@@ -708,7 +737,7 @@ def point_account_data(account: PointAccount) -> dict:
 def manual_adjustment_data(adjustment: ManualPointAdjustment) -> dict:
     return {
         "id": adjustment.id,
-        "member_id": adjustment.member_id,
+        **member_brief(adjustment.member),
         "amount": adjustment.amount,
         "reason": adjustment.reason,
         "operator_id": adjustment.operator_id,

@@ -50,7 +50,6 @@ from apps.admin_portal.schemas import (
 from apps.admin_portal import services as svc
 from django_ratelimit.decorators import ratelimit
 from apps.civic_feedbacks.models import CivicFeedback
-from apps.civic_feedbacks.services import civic_feedback_data
 from apps.elder_services.models import ElderCareRelation, ElderServiceFeedback, ElderServiceTask
 from apps.learning.models import LearningContent, LearningRecord
 from apps.members.models import Member
@@ -58,11 +57,10 @@ from apps.members.services import member_data
 from apps.merchants.models import Merchant, MerchantPointCode, MerchantSettlement
 from apps.merchants.services import fixed_code_data, merchant_data, point_code_data, settlement_data
 from apps.points.models import ManualPointAdjustment, PointAccount, PointExchangeRule, PointRecord
-from apps.points.services import point_record_data
 from apps.problem_feedbacks.models import ProblemFeedback
-from apps.problem_feedbacks.services import problem_feedback_data, reply_problem_feedback
+from apps.problem_feedbacks.services import reply_problem_feedback
 from apps.reports.models import Report
-from apps.reports.services import report_data, review_report
+from apps.reports.services import review_report
 from shared.api import ErrorResponse, SuccessResponse, error_response, success_response
 from shared.exceptions import BusinessError
 from shared.ratelimit import user_key
@@ -346,7 +344,7 @@ def admin_reports(request, keyword: str = "", category_code: str = "", status: s
 def admin_report_detail(request, report_id: int):
     try:
         _admin_or_error(request)
-        return success_response(report_data(svc.get_or_404(Report, report_id)))
+        return success_response(svc.report_admin_data(svc.get_or_404(Report, report_id)))
     except BusinessError as exc:
         return _business_error(exc)
 
@@ -364,7 +362,7 @@ def admin_report_update(request, report_id: int, payload: ReportUpdateIn):
 def admin_report_review(request, report_id: int, payload: ReviewIn):
     try:
         admin = _admin_or_error(request)
-        return success_response(report_data(review_report(svc.get_or_404(Report, report_id), action=payload.action, comment=payload.comment, operator=admin)))
+        return success_response(svc.report_admin_data(review_report(svc.get_or_404(Report, report_id), action=payload.action, comment=payload.comment, operator=admin)))
     except BusinessError as exc:
         return _business_error(exc)
 
@@ -382,7 +380,7 @@ def admin_civic_feedbacks(request, keyword: str = "", status: str = "", page: in
 def admin_civic_feedback_detail(request, feedback_id: int):
     try:
         _admin_or_error(request)
-        return success_response(civic_feedback_data(svc.get_or_404(CivicFeedback, feedback_id)))
+        return success_response(svc.civic_feedback_admin_data(svc.get_or_404(CivicFeedback, feedback_id)))
     except BusinessError as exc:
         return _business_error(exc)
 
@@ -418,7 +416,7 @@ def admin_problem_feedbacks(request, keyword: str = "", status: str = "", page: 
 def admin_problem_feedback_detail(request, feedback_id: int):
     try:
         _admin_or_error(request)
-        return success_response(problem_feedback_data(svc.get_or_404(ProblemFeedback, feedback_id)))
+        return success_response(svc.problem_feedback_admin_data(svc.get_or_404(ProblemFeedback, feedback_id)))
     except BusinessError as exc:
         return _business_error(exc)
 
@@ -436,7 +434,7 @@ def admin_problem_feedback_update(request, feedback_id: int, payload: ProblemFee
 def admin_problem_feedback_reply(request, feedback_id: int, payload: ProblemFeedbackReplyIn):
     try:
         _admin_or_error(request)
-        return success_response(problem_feedback_data(reply_problem_feedback(svc.get_or_404(ProblemFeedback, feedback_id), reply=payload.reply)))
+        return success_response(svc.problem_feedback_admin_data(reply_problem_feedback(svc.get_or_404(ProblemFeedback, feedback_id), reply=payload.reply)))
     except BusinessError as exc:
         return _business_error(exc)
 
@@ -633,7 +631,7 @@ def admin_elder_relation_delete(request, relation_id: int):
 def admin_elder_tasks(request, page: int = 1, page_size: int = 20):
     try:
         _admin_or_error(request)
-        return success_response(svc.paginated_data(ElderServiceTask.objects.select_related("relation"), svc.elder_task_admin_data, page=page, page_size=page_size))
+        return success_response(svc.paginated_data(ElderServiceTask.objects.select_related("relation__member"), svc.elder_task_admin_data, page=page, page_size=page_size))
     except BusinessError as exc:
         return _business_error(exc)
 
@@ -692,7 +690,7 @@ def admin_elder_task_delete(request, task_id: int):
 def admin_elder_feedbacks(request, page: int = 1, page_size: int = 20):
     try:
         _admin_or_error(request)
-        return success_response(svc.paginated_data(ElderServiceFeedback.objects.select_related("member", "task", "relation"), svc.elder_feedback_data, page=page, page_size=page_size))
+        return success_response(svc.paginated_data(ElderServiceFeedback.objects.select_related("member", "task", "relation"), svc.elder_feedback_admin_data, page=page, page_size=page_size))
     except BusinessError as exc:
         return _business_error(exc)
 
@@ -701,7 +699,7 @@ def admin_elder_feedbacks(request, page: int = 1, page_size: int = 20):
 def admin_elder_feedback_detail(request, feedback_id: int):
     try:
         _admin_or_error(request)
-        return success_response(svc.elder_feedback_data(svc.get_or_404(ElderServiceFeedback, feedback_id)))
+        return success_response(svc.elder_feedback_admin_data(svc.get_or_404(ElderServiceFeedback, feedback_id)))
     except BusinessError as exc:
         return _business_error(exc)
 
@@ -719,7 +717,7 @@ def admin_elder_feedback_update(request, feedback_id: int, payload: ElderFeedbac
 def admin_elder_feedback_review(request, feedback_id: int, payload: ReviewIn):
     try:
         admin = _admin_or_error(request)
-        return success_response(svc.elder_feedback_data(svc.review_feedback(svc.get_or_404(ElderServiceFeedback, feedback_id), action=payload.action, comment=payload.comment, operator=admin)))
+        return success_response(svc.elder_feedback_admin_data(svc.review_feedback(svc.get_or_404(ElderServiceFeedback, feedback_id), action=payload.action, comment=payload.comment, operator=admin)))
     except BusinessError as exc:
         return _business_error(exc)
 
@@ -749,7 +747,7 @@ def admin_point_account_detail(request, account_id: int):
 def admin_point_records(request, page: int = 1, page_size: int = 20):
     try:
         _admin_or_error(request)
-        return success_response(svc.paginated_data(PointRecord.objects.select_related("merchant", "member"), point_record_data, page=page, page_size=page_size))
+        return success_response(svc.paginated_data(PointRecord.objects.select_related("merchant", "member"), svc.point_record_admin_data, page=page, page_size=page_size))
     except BusinessError as exc:
         return _business_error(exc)
 
@@ -758,7 +756,7 @@ def admin_point_records(request, page: int = 1, page_size: int = 20):
 def admin_point_record_detail(request, record_id: int):
     try:
         _admin_or_error(request)
-        return success_response(point_record_data(svc.get_or_404(PointRecord, record_id)))
+        return success_response(svc.point_record_admin_data(svc.get_or_404(PointRecord, record_id)))
     except BusinessError as exc:
         return _business_error(exc)
 

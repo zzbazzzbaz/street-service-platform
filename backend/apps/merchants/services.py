@@ -15,6 +15,7 @@ from apps.points.models import PointExchangeRule, PointRecord
 from apps.points.services import deduct_points, get_or_create_account
 from shared.auth import issue_token
 from shared.exceptions import BusinessError
+from shared.privacy import mask_name, mask_phone
 from shared.wechat import code_to_openid as wechat_code_to_openid
 from shared.wechat import phone_code_to_phone as wechat_phone_code_to_phone
 
@@ -88,22 +89,6 @@ def wechat_phone_login(login_code: str, phone_code: str) -> dict:
         "expires_in": expires_in,
         "merchant": merchant_data(merchant),
     }
-
-
-def mask_name(value: str) -> str:
-    value = (value or "").strip()
-    if not value:
-        return ""
-    if len(value) == 1:
-        return "*"
-    return f"{value[0]}*"
-
-
-def mask_phone(value: str) -> str:
-    value = (value or "").strip()
-    if len(value) < 7:
-        return ""
-    return f"{value[:3]}****{value[-4:]}"
 
 
 def active_exchange_rule() -> PointExchangeRule:
