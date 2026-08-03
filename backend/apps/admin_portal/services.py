@@ -391,6 +391,7 @@ def civic_feedback_admin_data(feedback: CivicFeedback) -> dict:
 def problem_feedback_admin_data(feedback: ProblemFeedback) -> dict:
     data = problem_feedback_data(feedback)
     data.update(member_brief(feedback.member))
+    data["source_type"] = "problem_feedback"
     return data
 
 
@@ -488,21 +489,27 @@ def review_civic_feedback(feedback_id: int, payload, operator) -> dict:
     return civic_feedback_admin_data(feedback)
 
 
-def problem_feedbacks_data(*, keyword: str = "", status: str = "", page: int = 1, page_size: int = 20) -> dict:
+def problem_feedbacks_data(*, keyword: str = "", status: str = "", visibility_status: str = "", member_id: int = 0, page: int = 1, page_size: int = 20) -> dict:
     queryset = ProblemFeedback.objects.select_related("member")
     if keyword:
-        queryset = queryset.filter(Q(member__openid__icontains=keyword) | Q(member__nickname__icontains=keyword) | Q(title__icontains=keyword))
+        queryset = queryset.filter(
+            Q(member__openid__icontains=keyword)
+            | Q(member__nickname__icontains=keyword)
+            | Q(member__real_name__icontains=keyword)
+            | Q(title__icontains=keyword)
+            | Q(content__icontains=keyword)
+        )
     if status:
         queryset = queryset.filter(status=status)
+    if visibility_status:
+        queryset = queryset.filter(visibility_status=visibility_status)
+    if member_id:
+        queryset = queryset.filter(member_id=member_id)
     return paginated_data(queryset, problem_feedback_admin_data, page=page, page_size=page_size)
 
 
 def update_problem_feedback(feedback_id: int, payload) -> dict:
     feedback = get_or_404(ProblemFeedback, feedback_id)
-    for field in ["title", "content"]:
-        value = getattr(payload, field)
-        if value is not None:
-            setattr(feedback, field, value.strip())
     if payload.status is not None:
         set_problem_feedback_status(feedback.id, status=payload.status)
         feedback.refresh_from_db()
@@ -519,6 +526,23 @@ def set_problem_feedback_status(feedback_id: int, *, status: str) -> dict:
         raise BusinessError("请先回复问题反馈")
     feedback.status = status
     feedback.save(update_fields=["status", "updated_at"])
+    return problem_feedback_admin_data(feedback)
+
+
+def review_problem_feedback_visibility(feedback_id: int, *, visibility_status: str, is_public: bool, operator) -> dict:
+    feedback = get_or_404(ProblemFeedback, feedback_id)
+    valid_statuses = ProblemFeedback.VisibilityStatus.values
+    if visibility_status not in valid_statuses:
+        raise BusinessError("公开审核状态不支持")
+    if visibility_status == ProblemFeedback.VisibilityStatus.APPROVED and not is_public:
+        raise BusinessError("审核通过必须对应 is_public = true")
+    if visibility_status in {ProblemFeedback.VisibilityStatus.PENDING, ProblemFeedback.VisibilityStatus.REJECTED} and is_public:
+        raise BusinessError("待审核或驳回状态不能设为公开")
+    feedback.visibility_status = visibility_status
+    feedback.is_public = is_public
+    feedback.visibility_reviewer = operator
+    feedback.visibility_reviewed_at = timezone.now()
+    feedback.save(update_fields=["visibility_status", "is_public", "visibility_reviewer", "visibility_reviewed_at", "updated_at"])
     return problem_feedback_admin_data(feedback)
 
 

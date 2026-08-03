@@ -156,8 +156,6 @@ class CivicFeedbackReviewIn(Schema):
 
 
 class ProblemFeedbackUpdateIn(Schema):
-    title: str | None = None
-    content: str | None = None
     status: str | None = None
 
 
@@ -167,6 +165,11 @@ class ProblemFeedbackReplyIn(Schema):
 
 class ProblemFeedbackStatusIn(Schema):
     status: str
+
+
+class VisibilityReviewIn(Schema):
+    visibility_status: str
+    is_public: bool
 
 
 class ActivityIn(Schema):
