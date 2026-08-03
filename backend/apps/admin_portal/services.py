@@ -403,6 +403,7 @@ def point_record_admin_data(record: PointRecord) -> dict:
 def elder_feedback_admin_data(feedback: ElderServiceFeedback, request=None) -> dict:
     data = elder_feedback_data(feedback, request=request)
     data.update(member_brief(feedback.member))
+    data["source_type"] = "elder_service"
     return data
 
 
@@ -601,7 +602,6 @@ def relation_data(relation: ElderCareRelation) -> dict:
         **member_brief(relation.member),
         "elder_name": relation.elder_name,
         "elder_address": relation.elder_address,
-        "frequency": relation.frequency,
         "is_active": relation.is_active,
         "created_at": relation.created_at,
         "updated_at": relation.updated_at,
@@ -622,7 +622,6 @@ def create_relation(payload) -> ElderCareRelation:
         member=member,
         elder_name=payload.elder_name.strip(),
         elder_address=payload.elder_address.strip(),
-        frequency=payload.frequency.strip(),
         is_active=payload.is_active,
     )
 
@@ -633,7 +632,7 @@ def update_relation(relation_id: int, payload) -> ElderCareRelation:
         member = get_or_404(Member, payload.member_id)
         validate_relation_member(member)
         relation.member = member
-    for field in ["elder_name", "elder_address", "frequency", "is_active"]:
+    for field in ["elder_name", "elder_address", "is_active"]:
         value = getattr(payload, field)
         if value is not None:
             setattr(relation, field, value.strip() if isinstance(value, str) else value)
@@ -711,13 +710,13 @@ def delete_elder_task(task_id: int) -> dict:
 
 def update_elder_feedback(feedback_id: int, payload) -> dict:
     feedback = get_or_404(ElderServiceFeedback, feedback_id)
-    if payload.content is not None:
-        feedback.content = payload.content.strip()
-    if payload.image is not None:
-        feedback.image = _media_field_value(payload.image)
-    if payload.image_urls is not None:
-        feedback.image_urls = [str(url).strip() for url in payload.image_urls if str(url).strip()]
-    feedback.save()
+    if payload.points is not None:
+        if feedback.status != ElderServiceFeedback.Status.PENDING:
+            raise BusinessError("只有待审核记录可以修改积分")
+        if payload.points < 0:
+            raise BusinessError("积分值必须为非负整数")
+        feedback.points = payload.points
+        feedback.save(update_fields=["points", "updated_at"])
     return elder_feedback_admin_data(feedback)
 
 

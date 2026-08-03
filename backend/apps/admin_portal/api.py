@@ -687,10 +687,25 @@ def admin_elder_task_delete(request, task_id: int):
 
 
 @router.get("/elder-services/feedbacks", response={200: SuccessResponse[dict], 401: ErrorResponse, 403: ErrorResponse})
-def admin_elder_feedbacks(request, page: int = 1, page_size: int = 20):
+def admin_elder_feedbacks(request, status: str = "", member_id: int = 0, relation_id: int = 0, keyword: str = "", page: int = 1, page_size: int = 20):
     try:
         _admin_or_error(request)
-        return success_response(svc.paginated_data(ElderServiceFeedback.objects.select_related("member", "task", "relation"), svc.elder_feedback_admin_data, page=page, page_size=page_size))
+        queryset = ElderServiceFeedback.objects.select_related("member", "task", "relation")
+        if status:
+            queryset = queryset.filter(status=status)
+        if member_id:
+            queryset = queryset.filter(member_id=member_id)
+        if relation_id:
+            queryset = queryset.filter(relation_id=relation_id)
+        if keyword:
+            from django.db.models import Q
+            queryset = queryset.filter(
+                Q(member__nickname__icontains=keyword)
+                | Q(member__real_name__icontains=keyword)
+                | Q(member__phone__icontains=keyword)
+                | Q(elder_name__icontains=keyword)
+            )
+        return success_response(svc.paginated_data(queryset, svc.elder_feedback_admin_data, page=page, page_size=page_size))
     except BusinessError as exc:
         return _business_error(exc)
 

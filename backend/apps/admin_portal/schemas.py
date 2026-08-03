@@ -197,7 +197,6 @@ class ElderRelationIn(Schema):
     member_id: int
     elder_name: str
     elder_address: str
-    frequency: str = ""
     is_active: bool = True
 
 
@@ -205,7 +204,6 @@ class ElderRelationUpdateIn(Schema):
     member_id: int | None = None
     elder_name: str | None = None
     elder_address: str | None = None
-    frequency: str | None = None
     is_active: bool | None = None
 
 
@@ -232,9 +230,7 @@ class GenericStatusIn(Schema):
 
 
 class ElderFeedbackUpdateIn(Schema):
-    content: str | None = None
-    image: str | None = None
-    image_urls: list[str] | None = None
+    points: int | None = None
 
 
 class ManualAdjustmentCreateIn(Schema):
