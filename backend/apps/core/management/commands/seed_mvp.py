@@ -190,7 +190,7 @@ class Command(BaseCommand):
         delivery_relation, _ = ElderCareRelation.objects.update_or_create(
             member=member,
             elder_name="张爷爷",
-            defaults={"elder_address": "邻里服务站附近", "frequency": "按需配送", "is_active": True},
+            defaults={"elder_address": "邻里服务站附近", "frequency": "按需配送", "is_active": False},
         )
 
         elder_task, _ = ElderServiceTask.objects.update_or_create(

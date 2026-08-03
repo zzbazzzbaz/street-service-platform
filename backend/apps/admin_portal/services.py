@@ -379,12 +379,14 @@ def admin_record_data(record: LearningRecord) -> dict:
 def report_admin_data(report: Report, request=None) -> dict:
     data = report_data(report, request=request)
     data.update(member_brief(report.member))
+    data["source_type"] = "report"
     return data
 
 
 def civic_feedback_admin_data(feedback: CivicFeedback) -> dict:
     data = civic_feedback_data(feedback)
     data.update(member_brief(feedback.member))
+    data["source_type"] = "civic_feedback"
     return data
 
 
@@ -604,6 +606,7 @@ def checkin_admin_data(checkin: ActivityCheckin) -> dict:
     data = checkin_data(checkin)
     data.update(member_brief(checkin.member))
     data["activity_title"] = checkin.activity.title
+    data["source_type"] = "activity"
     return data
 
 
