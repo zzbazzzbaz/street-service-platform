@@ -1,4 +1,5 @@
 from django.db import models
+from django.db.models import Q
 
 
 class ElderCareRelation(models.Model):
@@ -15,6 +16,18 @@ class ElderCareRelation(models.Model):
         verbose_name = "小哥-老人关系"
         verbose_name_plural = "小哥-老人关系"
         ordering = ("-created_at", "-id")
+        constraints = [
+            models.UniqueConstraint(
+                fields=["member"],
+                condition=Q(is_active=True),
+                name="uniq_active_relation_per_member",
+            ),
+            models.UniqueConstraint(
+                fields=["elder_name", "elder_address"],
+                condition=Q(is_active=True),
+                name="uniq_active_elder",
+            ),
+        ]
 
     def __str__(self) -> str:
         return f"{self.member} - {self.elder_name}"
@@ -66,12 +79,23 @@ class ElderServiceFeedback(models.Model):
         blank=True,
         verbose_name="对口关系",
     )
-    task = models.ForeignKey(ElderServiceTask, on_delete=models.CASCADE, related_name="feedbacks", verbose_name="任务")
+    task = models.ForeignKey(
+        ElderServiceTask,
+        on_delete=models.CASCADE,
+        related_name="feedbacks",
+        null=True,
+        blank=True,
+        verbose_name="关联任务（旧）",
+    )
+    elder_name = models.CharField("老人姓名快照", max_length=80, blank=True)
+    elder_address = models.CharField("老人地址快照", max_length=255, blank=True)
     content = models.TextField("反馈内容")
     image = models.ImageField("图片", upload_to="elder-services/feedbacks/", blank=True)
     image_urls = models.JSONField("图片URL列表", default=list, blank=True)
+    points = models.PositiveIntegerField("积分值", default=0)
     status = models.CharField("状态", max_length=20, choices=Status.choices, default=Status.PENDING)
     review_comment = models.CharField("审核意见", max_length=255, blank=True)
+    reviewed_at = models.DateTimeField("审核时间", null=True, blank=True)
     point_record = models.ForeignKey(
         "points.PointRecord",
         on_delete=models.SET_NULL,
@@ -90,4 +114,4 @@ class ElderServiceFeedback(models.Model):
         ordering = ("-created_at", "-id")
 
     def __str__(self) -> str:
-        return f"{self.member} - {self.task}"
+        return f"{self.member} - {self.elder_name or (self.task.title if self.task_id else '')}"

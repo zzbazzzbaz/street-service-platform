@@ -99,19 +99,24 @@ def submit_feedback(member: Member, task: ElderServiceTask, *, content: str, ima
 
 @transaction.atomic
 def review_feedback(feedback: ElderServiceFeedback, *, action: str, comment: str, operator) -> ElderServiceFeedback:
-    feedback = ElderServiceFeedback.objects.select_for_update().select_related("task", "member").get(pk=feedback.pk)
+    feedback = ElderServiceFeedback.objects.select_for_update().select_related("member").get(pk=feedback.pk)
     if feedback.status != ElderServiceFeedback.Status.PENDING:
         raise BusinessError("反馈已审核")
 
     if action == "approve":
         point_record = None
-        if feedback.task.points > 0:
+        if feedback.task_id:
+            feedback.task = ElderServiceTask.objects.get(pk=feedback.task_id)
+        points = feedback.points
+        if points == 0 and feedback.task_id and feedback.task:
+            points = feedback.task.points
+        if points > 0:
             point_record = add_points(
                 feedback.member,
-                feedback.task.points,
+                points,
                 source_type=PointRecord.SourceType.ELDER_SERVICE,
                 source_id=str(feedback.id),
-                reason=f"老人服务审核通过：{feedback.task.title}",
+                reason=f"结对帮扶审核通过：{feedback.elder_name or (feedback.task.title if feedback.task_id and feedback.task else '')}",
                 operator=operator,
             )
         feedback.status = ElderServiceFeedback.Status.APPROVED
@@ -123,6 +128,8 @@ def review_feedback(feedback: ElderServiceFeedback, *, action: str, comment: str
     else:
         raise BusinessError("审核动作不支持")
 
+    from django.utils import timezone
     feedback.review_comment = comment.strip()
-    feedback.save(update_fields=["status", "review_comment", "point_record", "updated_at"])
+    feedback.reviewed_at = timezone.now()
+    feedback.save(update_fields=["status", "review_comment", "reviewed_at", "point_record", "updated_at"])
     return feedback
