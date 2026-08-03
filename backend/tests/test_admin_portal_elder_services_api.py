@@ -59,7 +59,7 @@ class AdminPortalElderServicesApiTests(TestCase):
         self.assertEqual(feedback_review.status_code, 200)
         self.assertEqual(PointAccount.objects.get(member=self.courier).balance, 7)
         self.assertEqual(PointRecord.objects.get(source_type=PointRecord.SourceType.ELDER_SERVICE).operator_id, self.admin.id)
-        self.assertEqual(repeat.status_code, 400)
+        self.assertEqual(repeat.status_code, 409)
         self.assertEqual(task_delete.status_code, 400)
         self.assertEqual(relation_status.status_code, 200)
         self.assertFalse(relation_status.json()["data"]["is_active"])

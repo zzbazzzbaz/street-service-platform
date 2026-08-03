@@ -24,16 +24,35 @@ class FeedbackIn(Schema):
     image_urls: list[str] = []
 
 
+class DirectFeedbackIn(Schema):
+    content: str
+    image_urls: list[str] = []
+
+
+class ElderRelationOut(Schema):
+    id: int
+    member_id: int
+    elder_name: str
+    elder_address: str
+    is_active: bool
+    created_at: datetime
+    updated_at: datetime
+
+
 class ElderServiceFeedbackOut(Schema):
     id: int
-    task_id: int
+    relation_id: int | None = None
+    member_id: int | None = None
+    task_id: int | None = None
     task_title: str = ""
     elder_name: str = ""
+    elder_address: str = ""
     content: str
     image_urls: list[str]
     points: int = 0
     status: str
     review_comment: str
+    reviewed_at: datetime | None = None
     point_record_id: int | None = None
     created_at: datetime
 
