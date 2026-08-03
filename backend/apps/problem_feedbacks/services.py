@@ -13,6 +13,22 @@ def problem_feedback_data(feedback: ProblemFeedback) -> dict:
         "title": feedback.title,
         "content": feedback.content,
         "status": feedback.status,
+        "visibility_status": feedback.visibility_status,
+        "is_public": feedback.is_public,
+        "reply": feedback.reply,
+        "replied_at": feedback.replied_at,
+        "created_at": feedback.created_at,
+    }
+
+
+def public_problem_feedback_data(feedback: ProblemFeedback) -> dict:
+    return {
+        "id": feedback.id,
+        "title": feedback.title,
+        "content": feedback.content,
+        "status": feedback.status,
+        "visibility_status": feedback.visibility_status,
+        "is_public": feedback.is_public,
         "reply": feedback.reply,
         "replied_at": feedback.replied_at,
         "created_at": feedback.created_at,

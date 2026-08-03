@@ -46,6 +46,7 @@ from apps.admin_portal.schemas import (
     SettlementProcessIn,
     SettlementUpdateIn,
     StatusIn,
+    VisibilityReviewIn,
 )
 from apps.admin_portal import services as svc
 from django_ratelimit.decorators import ratelimit
@@ -404,10 +405,13 @@ def admin_civic_feedback_review(request, feedback_id: int, payload: CivicFeedbac
 
 
 @router.get("/problem-feedbacks", response={200: SuccessResponse[dict], 401: ErrorResponse, 403: ErrorResponse})
-def admin_problem_feedbacks(request, keyword: str = "", status: str = "", page: int = 1, page_size: int = 20):
+def admin_problem_feedbacks(request, keyword: str = "", status: str = "", visibility_status: str = "", member_id: int = 0, page: int = 1, page_size: int = 20):
     try:
         _admin_or_error(request)
-        return success_response(svc.problem_feedbacks_data(keyword=keyword, status=status, page=page, page_size=page_size))
+        return success_response(svc.problem_feedbacks_data(
+            keyword=keyword, status=status, visibility_status=visibility_status,
+            member_id=member_id, page=page, page_size=page_size,
+        ))
     except BusinessError as exc:
         return _business_error(exc)
 
@@ -444,6 +448,20 @@ def admin_problem_feedback_status(request, feedback_id: int, payload: ProblemFee
     try:
         _admin_or_error(request)
         return success_response(svc.set_problem_feedback_status(feedback_id, status=payload.status))
+    except BusinessError as exc:
+        return _business_error(exc)
+
+
+@router.post("/problem-feedbacks/{feedback_id}/visibility", response={200: SuccessResponse[dict], 400: ErrorResponse, 401: ErrorResponse, 403: ErrorResponse, 404: ErrorResponse})
+def admin_problem_feedback_visibility(request, feedback_id: int, payload: VisibilityReviewIn):
+    try:
+        admin = _admin_or_error(request)
+        return success_response(svc.review_problem_feedback_visibility(
+            feedback_id,
+            visibility_status=payload.visibility_status,
+            is_public=payload.is_public,
+            operator=admin,
+        ))
     except BusinessError as exc:
         return _business_error(exc)
 
@@ -687,10 +705,25 @@ def admin_elder_task_delete(request, task_id: int):
 
 
 @router.get("/elder-services/feedbacks", response={200: SuccessResponse[dict], 401: ErrorResponse, 403: ErrorResponse})
-def admin_elder_feedbacks(request, page: int = 1, page_size: int = 20):
+def admin_elder_feedbacks(request, status: str = "", member_id: int = 0, relation_id: int = 0, keyword: str = "", page: int = 1, page_size: int = 20):
     try:
         _admin_or_error(request)
-        return success_response(svc.paginated_data(ElderServiceFeedback.objects.select_related("member", "task", "relation"), svc.elder_feedback_admin_data, page=page, page_size=page_size))
+        queryset = ElderServiceFeedback.objects.select_related("member", "task", "relation")
+        if status:
+            queryset = queryset.filter(status=status)
+        if member_id:
+            queryset = queryset.filter(member_id=member_id)
+        if relation_id:
+            queryset = queryset.filter(relation_id=relation_id)
+        if keyword:
+            from django.db.models import Q
+            queryset = queryset.filter(
+                Q(member__nickname__icontains=keyword)
+                | Q(member__real_name__icontains=keyword)
+                | Q(member__phone__icontains=keyword)
+                | Q(elder_name__icontains=keyword)
+            )
+        return success_response(svc.paginated_data(queryset, svc.elder_feedback_admin_data, page=page, page_size=page_size))
     except BusinessError as exc:
         return _business_error(exc)
 

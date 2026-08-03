@@ -379,18 +379,21 @@ def admin_record_data(record: LearningRecord) -> dict:
 def report_admin_data(report: Report, request=None) -> dict:
     data = report_data(report, request=request)
     data.update(member_brief(report.member))
+    data["source_type"] = "report"
     return data
 
 
 def civic_feedback_admin_data(feedback: CivicFeedback) -> dict:
     data = civic_feedback_data(feedback)
     data.update(member_brief(feedback.member))
+    data["source_type"] = "civic_feedback"
     return data
 
 
 def problem_feedback_admin_data(feedback: ProblemFeedback) -> dict:
     data = problem_feedback_data(feedback)
     data.update(member_brief(feedback.member))
+    data["source_type"] = "problem_feedback"
     return data
 
 
@@ -403,6 +406,7 @@ def point_record_admin_data(record: PointRecord) -> dict:
 def elder_feedback_admin_data(feedback: ElderServiceFeedback, request=None) -> dict:
     data = elder_feedback_data(feedback, request=request)
     data.update(member_brief(feedback.member))
+    data["source_type"] = "elder_service"
     return data
 
 
@@ -487,21 +491,27 @@ def review_civic_feedback(feedback_id: int, payload, operator) -> dict:
     return civic_feedback_admin_data(feedback)
 
 
-def problem_feedbacks_data(*, keyword: str = "", status: str = "", page: int = 1, page_size: int = 20) -> dict:
+def problem_feedbacks_data(*, keyword: str = "", status: str = "", visibility_status: str = "", member_id: int = 0, page: int = 1, page_size: int = 20) -> dict:
     queryset = ProblemFeedback.objects.select_related("member")
     if keyword:
-        queryset = queryset.filter(Q(member__openid__icontains=keyword) | Q(member__nickname__icontains=keyword) | Q(title__icontains=keyword))
+        queryset = queryset.filter(
+            Q(member__openid__icontains=keyword)
+            | Q(member__nickname__icontains=keyword)
+            | Q(member__real_name__icontains=keyword)
+            | Q(title__icontains=keyword)
+            | Q(content__icontains=keyword)
+        )
     if status:
         queryset = queryset.filter(status=status)
+    if visibility_status:
+        queryset = queryset.filter(visibility_status=visibility_status)
+    if member_id:
+        queryset = queryset.filter(member_id=member_id)
     return paginated_data(queryset, problem_feedback_admin_data, page=page, page_size=page_size)
 
 
 def update_problem_feedback(feedback_id: int, payload) -> dict:
     feedback = get_or_404(ProblemFeedback, feedback_id)
-    for field in ["title", "content"]:
-        value = getattr(payload, field)
-        if value is not None:
-            setattr(feedback, field, value.strip())
     if payload.status is not None:
         set_problem_feedback_status(feedback.id, status=payload.status)
         feedback.refresh_from_db()
@@ -518,6 +528,23 @@ def set_problem_feedback_status(feedback_id: int, *, status: str) -> dict:
         raise BusinessError("请先回复问题反馈")
     feedback.status = status
     feedback.save(update_fields=["status", "updated_at"])
+    return problem_feedback_admin_data(feedback)
+
+
+def review_problem_feedback_visibility(feedback_id: int, *, visibility_status: str, is_public: bool, operator) -> dict:
+    feedback = get_or_404(ProblemFeedback, feedback_id)
+    valid_statuses = ProblemFeedback.VisibilityStatus.values
+    if visibility_status not in valid_statuses:
+        raise BusinessError("公开审核状态不支持")
+    if visibility_status == ProblemFeedback.VisibilityStatus.APPROVED and not is_public:
+        raise BusinessError("审核通过必须对应 is_public = true")
+    if visibility_status in {ProblemFeedback.VisibilityStatus.PENDING, ProblemFeedback.VisibilityStatus.REJECTED} and is_public:
+        raise BusinessError("待审核或驳回状态不能设为公开")
+    feedback.visibility_status = visibility_status
+    feedback.is_public = is_public
+    feedback.visibility_reviewer = operator
+    feedback.visibility_reviewed_at = timezone.now()
+    feedback.save(update_fields=["visibility_status", "is_public", "visibility_reviewer", "visibility_reviewed_at", "updated_at"])
     return problem_feedback_admin_data(feedback)
 
 
@@ -579,6 +606,7 @@ def checkin_admin_data(checkin: ActivityCheckin) -> dict:
     data = checkin_data(checkin)
     data.update(member_brief(checkin.member))
     data["activity_title"] = checkin.activity.title
+    data["source_type"] = "activity"
     return data
 
 
@@ -601,7 +629,6 @@ def relation_data(relation: ElderCareRelation) -> dict:
         **member_brief(relation.member),
         "elder_name": relation.elder_name,
         "elder_address": relation.elder_address,
-        "frequency": relation.frequency,
         "is_active": relation.is_active,
         "created_at": relation.created_at,
         "updated_at": relation.updated_at,
@@ -622,7 +649,6 @@ def create_relation(payload) -> ElderCareRelation:
         member=member,
         elder_name=payload.elder_name.strip(),
         elder_address=payload.elder_address.strip(),
-        frequency=payload.frequency.strip(),
         is_active=payload.is_active,
     )
 
@@ -633,7 +659,7 @@ def update_relation(relation_id: int, payload) -> ElderCareRelation:
         member = get_or_404(Member, payload.member_id)
         validate_relation_member(member)
         relation.member = member
-    for field in ["elder_name", "elder_address", "frequency", "is_active"]:
+    for field in ["elder_name", "elder_address", "is_active"]:
         value = getattr(payload, field)
         if value is not None:
             setattr(relation, field, value.strip() if isinstance(value, str) else value)
@@ -711,13 +737,13 @@ def delete_elder_task(task_id: int) -> dict:
 
 def update_elder_feedback(feedback_id: int, payload) -> dict:
     feedback = get_or_404(ElderServiceFeedback, feedback_id)
-    if payload.content is not None:
-        feedback.content = payload.content.strip()
-    if payload.image is not None:
-        feedback.image = _media_field_value(payload.image)
-    if payload.image_urls is not None:
-        feedback.image_urls = [str(url).strip() for url in payload.image_urls if str(url).strip()]
-    feedback.save()
+    if payload.points is not None:
+        if feedback.status != ElderServiceFeedback.Status.PENDING:
+            raise BusinessError("只有待审核记录可以修改积分")
+        if payload.points < 0:
+            raise BusinessError("积分值必须为非负整数")
+        feedback.points = payload.points
+        feedback.save(update_fields=["points", "updated_at"])
     return elder_feedback_admin_data(feedback)
 
 

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from django.db import transaction
 
-from apps.elder_services.models import ElderServiceFeedback, ElderServiceTask
+from apps.elder_services.models import ElderCareRelation, ElderServiceFeedback, ElderServiceTask
 from apps.members.models import Member
 from apps.points.models import PointRecord
 from apps.points.services import add_points
@@ -20,19 +20,46 @@ def task_data(task: ElderServiceTask) -> dict:
     }
 
 
+def my_relation_data(member: Member) -> dict | None:
+    relation = (
+        ElderCareRelation.objects.filter(member=member, is_active=True)
+        .order_by("-created_at")
+        .first()
+    )
+    if relation is None:
+        return None
+    return {
+        "id": relation.id,
+        "member_id": relation.member_id,
+        "elder_name": relation.elder_name,
+        "elder_address": relation.elder_address,
+        "is_active": relation.is_active,
+        "created_at": relation.created_at,
+        "updated_at": relation.updated_at,
+    }
+
+
 def feedback_data(feedback: ElderServiceFeedback, request=None) -> dict:
-    task = feedback.task
-    relation = feedback.relation or task.relation
+    relation = feedback.relation or (feedback.task.relation if feedback.task_id and feedback.task else None)
+    elder_name = feedback.elder_name or (relation.elder_name if relation else "")
+    elder_address = feedback.elder_address or (relation.elder_address if relation else "")
+    points = feedback.points
+    if points == 0 and feedback.task_id and feedback.task:
+        points = feedback.task.points
     return {
         "id": feedback.id,
+        "relation_id": feedback.relation_id,
+        "member_id": feedback.member_id,
         "task_id": feedback.task_id,
-        "task_title": task.title,
-        "elder_name": relation.elder_name if relation else "",
+        "task_title": feedback.task.title if feedback.task_id and feedback.task else "",
+        "elder_name": elder_name,
+        "elder_address": elder_address,
         "content": feedback.content,
         "image_urls": feedback.image_urls,
-        "points": task.points,
+        "points": points,
         "status": feedback.status,
         "review_comment": feedback.review_comment,
+        "reviewed_at": feedback.reviewed_at,
         "point_record_id": feedback.point_record_id,
         "created_at": feedback.created_at,
     }
@@ -97,21 +124,54 @@ def submit_feedback(member: Member, task: ElderServiceTask, *, content: str, ima
     )
 
 
+def create_feedback_direct(member: Member, *, content: str, image_urls: list[str] | None = None) -> ElderServiceFeedback:
+    relation = (
+        ElderCareRelation.objects.filter(member=member, is_active=True)
+        .order_by("-created_at")
+        .first()
+    )
+    if relation is None:
+        raise BusinessError("暂未配置有效的结对帮扶关系", code=40301, status=403)
+    content = content.strip()
+    if not content:
+        raise BusinessError("帮扶记录内容不能为空")
+    image_urls = [str(url).strip() for url in (image_urls or []) if str(url).strip()]
+    if not image_urls:
+        raise BusinessError("至少上传 1 张帮扶现场照片")
+    if len(image_urls) > 10:
+        raise BusinessError("帮扶图片最多 10 张")
+    return ElderServiceFeedback.objects.create(
+        member=member,
+        relation=relation,
+        task=None,
+        elder_name=relation.elder_name,
+        elder_address=relation.elder_address,
+        content=content,
+        image_urls=image_urls,
+        points=0,
+    )
+
+
 @transaction.atomic
 def review_feedback(feedback: ElderServiceFeedback, *, action: str, comment: str, operator) -> ElderServiceFeedback:
-    feedback = ElderServiceFeedback.objects.select_for_update().select_related("task", "member").get(pk=feedback.pk)
+    feedback = ElderServiceFeedback.objects.select_for_update().select_related("member").get(pk=feedback.pk)
     if feedback.status != ElderServiceFeedback.Status.PENDING:
-        raise BusinessError("反馈已审核")
+        raise BusinessError("反馈已审核", code=40900, status=409)
 
     if action == "approve":
         point_record = None
-        if feedback.task.points > 0:
+        if feedback.task_id:
+            feedback.task = ElderServiceTask.objects.get(pk=feedback.task_id)
+        points = feedback.points
+        if points == 0 and feedback.task_id and feedback.task:
+            points = feedback.task.points
+        if points > 0:
             point_record = add_points(
                 feedback.member,
-                feedback.task.points,
+                points,
                 source_type=PointRecord.SourceType.ELDER_SERVICE,
                 source_id=str(feedback.id),
-                reason=f"老人服务审核通过：{feedback.task.title}",
+                reason=f"结对帮扶审核通过：{feedback.elder_name or (feedback.task.title if feedback.task_id and feedback.task else '')}",
                 operator=operator,
             )
         feedback.status = ElderServiceFeedback.Status.APPROVED
@@ -123,6 +183,8 @@ def review_feedback(feedback: ElderServiceFeedback, *, action: str, comment: str
     else:
         raise BusinessError("审核动作不支持")
 
+    from django.utils import timezone
     feedback.review_comment = comment.strip()
-    feedback.save(update_fields=["status", "review_comment", "point_record", "updated_at"])
+    feedback.reviewed_at = timezone.now()
+    feedback.save(update_fields=["status", "review_comment", "reviewed_at", "point_record", "updated_at"])
     return feedback

@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.db import models
 
 
@@ -8,12 +9,28 @@ class ProblemFeedback(models.Model):
         REPLIED = "replied", "已回复"
         CLOSED = "closed", "已关闭"
 
+    class VisibilityStatus(models.TextChoices):
+        PENDING = "pending", "待审核"
+        APPROVED = "approved", "已公开"
+        REJECTED = "rejected", "未公开"
+
     member = models.ForeignKey("members.Member", on_delete=models.CASCADE, related_name="problem_feedbacks", verbose_name="用户")
     title = models.CharField("标题", max_length=120)
     content = models.TextField("内容")
     status = models.CharField("状态", max_length=20, choices=Status.choices, default=Status.SUBMITTED)
     reply = models.TextField("回复", blank=True)
     replied_at = models.DateTimeField("回复时间", null=True, blank=True)
+    visibility_status = models.CharField("公开审核状态", max_length=20, choices=VisibilityStatus.choices, default=VisibilityStatus.PENDING)
+    is_public = models.BooleanField("是否公开", default=False)
+    visibility_reviewer = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        related_name="reviewed_problem_feedbacks",
+        null=True,
+        blank=True,
+        verbose_name="公开审核人",
+    )
+    visibility_reviewed_at = models.DateTimeField("公开审核时间", null=True, blank=True)
     created_at = models.DateTimeField("创建时间", auto_now_add=True)
     updated_at = models.DateTimeField("更新时间", auto_now=True)
 
