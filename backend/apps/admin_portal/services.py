@@ -553,6 +553,20 @@ def review_problem_feedback_visibility(feedback_id: int, *, visibility_status: s
 # ---------------------------------------------------------------------------
 
 
+def validate_coordinates(latitude, longitude) -> None:
+    lat_empty = latitude is None
+    lng_empty = longitude is None
+    if lat_empty != lng_empty:
+        raise BusinessError("纬度和经度必须同时为空或同时有值")
+    if not lat_empty:
+        lat = float(latitude)
+        lng = float(longitude)
+        if not (-90 <= lat <= 90):
+            raise BusinessError("纬度范围为 -90 到 90")
+        if not (-180 <= lng <= 180):
+            raise BusinessError("经度范围为 -180 到 180")
+
+
 def validate_activity_payload(obj) -> None:
     if not obj.title.strip():
         raise BusinessError("标题不能为空")
@@ -562,6 +576,7 @@ def validate_activity_payload(obj) -> None:
         raise BusinessError("积分值必须为非负整数")
     if obj.end_time <= obj.start_time:
         raise BusinessError("结束时间必须晚于开始时间")
+    validate_coordinates(obj.latitude, obj.longitude)
 
 
 def create_activity(payload) -> Activity:
@@ -570,6 +585,8 @@ def create_activity(payload) -> Activity:
         title=payload.title.strip(),
         body=payload.body,
         location=payload.location.strip(),
+        latitude=payload.latitude,
+        longitude=payload.longitude,
         start_time=payload.start_time,
         end_time=payload.end_time,
         points=payload.points,
@@ -583,6 +600,10 @@ def update_activity(activity_id: int, payload) -> Activity:
         value = getattr(payload, field)
         if value is not None:
             setattr(activity, field, value.strip() if isinstance(value, str) else value)
+    if payload.latitude is not None or payload.longitude is not None:
+        validate_coordinates(payload.latitude, payload.longitude)
+        activity.latitude = payload.latitude
+        activity.longitude = payload.longitude
     validate_activity_payload(activity)
     activity.save()
     return activity

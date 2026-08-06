@@ -176,6 +176,8 @@ class ActivityIn(Schema):
     title: str
     body: str = ""
     location: str = ""
+    latitude: float | None = None
+    longitude: float | None = None
     start_time: datetime
     end_time: datetime
     points: int = 0
@@ -186,6 +188,8 @@ class ActivityUpdateIn(Schema):
     title: str | None = None
     body: str | None = None
     location: str | None = None
+    latitude: float | None = None
+    longitude: float | None = None
     start_time: datetime | None = None
     end_time: datetime | None = None
     points: int | None = None

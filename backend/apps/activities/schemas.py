@@ -8,6 +8,8 @@ class ActivityOut(Schema):
     title: str
     body: str
     location: str
+    latitude: float | None = None
+    longitude: float | None = None
     start_time: datetime
     end_time: datetime
     points: int
@@ -31,6 +33,8 @@ class ActivitySignupOut(Schema):
     title: str
     body: str
     location: str
+    latitude: float | None = None
+    longitude: float | None = None
     start_time: datetime
     end_time: datetime
     points: int
