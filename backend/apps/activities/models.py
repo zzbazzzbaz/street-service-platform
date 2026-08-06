@@ -17,6 +17,8 @@ class Activity(models.Model):
     title = models.CharField("标题", max_length=120)
     body = models.TextField("正文", blank=True)
     location = models.CharField("地点", max_length=255, blank=True)
+    latitude = models.FloatField("纬度", null=True, blank=True)
+    longitude = models.FloatField("经度", null=True, blank=True)
     start_time = models.DateTimeField("开始时间")
     end_time = models.DateTimeField("结束时间")
     points = models.PositiveIntegerField("积分值", default=0)

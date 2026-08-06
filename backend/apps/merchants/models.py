@@ -7,6 +7,8 @@ class Merchant(models.Model):
     contact_name = models.CharField("联系人", max_length=50, blank=True)
     phone = models.CharField("手机号", max_length=20, blank=True)
     address = models.CharField("经营地址", max_length=255, blank=True)
+    latitude = models.FloatField("纬度", null=True, blank=True)
+    longitude = models.FloatField("经度", null=True, blank=True)
     is_active = models.BooleanField("是否启用", default=True)
     created_at = models.DateTimeField("创建时间", auto_now_add=True)
 
