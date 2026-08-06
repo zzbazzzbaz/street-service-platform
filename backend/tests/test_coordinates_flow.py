@@ -223,3 +223,93 @@ class AdminMerchantCoordinateTests(TestCase):
         self.assertEqual(detail_resp.status_code, 200)
         data = detail_resp.json()["data"]
         self.assertAlmostEqual(data["latitude"], 39.908823, places=6)
+
+
+class UserActivityCoordinateTests(TestCase):
+    def setUp(self):
+        self.member = create_member()
+        self.headers = auth_header("member", self.member.openid)
+        self.activity = Activity.objects.create(
+            title="坐标活动",
+            body="",
+            location="天安门",
+            start_time=timezone.now(),
+            end_time=timezone.now() + timezone.timedelta(hours=2),
+            points=0,
+            status=Activity.Status.PUBLISHED,
+            latitude=39.908823,
+            longitude=116.397470,
+        )
+        self.activity_no_coords = Activity.objects.create(
+            title="无坐标活动",
+            body="",
+            location="某地",
+            start_time=timezone.now(),
+            end_time=timezone.now() + timezone.timedelta(hours=2),
+            points=0,
+            status=Activity.Status.PUBLISHED,
+        )
+
+    def test_activity_list_returns_coordinates(self):
+        response = self.client.get("/api/activities", **self.headers)
+        self.assertEqual(response.status_code, 200)
+        items = response.json()["data"]["items"]
+        coord_item = next(i for i in items if i["id"] == self.activity.id)
+        self.assertAlmostEqual(coord_item["latitude"], 39.908823, places=6)
+        self.assertAlmostEqual(coord_item["longitude"], 116.397470, places=6)
+        no_coord_item = next(i for i in items if i["id"] == self.activity_no_coords.id)
+        self.assertIsNone(no_coord_item["latitude"])
+        self.assertIsNone(no_coord_item["longitude"])
+
+    def test_activity_detail_returns_coordinates(self):
+        response = self.client.get(f"/api/activities/{self.activity.id}", **self.headers)
+        self.assertEqual(response.status_code, 200)
+        data = response.json()["data"]
+        self.assertAlmostEqual(data["latitude"], 39.908823, places=6)
+        self.assertAlmostEqual(data["longitude"], 116.397470, places=6)
+
+    def test_activity_detail_returns_null_when_no_coordinates(self):
+        response = self.client.get(f"/api/activities/{self.activity_no_coords.id}", **self.headers)
+        self.assertEqual(response.status_code, 200)
+        data = response.json()["data"]
+        self.assertIsNone(data["latitude"])
+        self.assertIsNone(data["longitude"])
+
+    def test_my_signups_returns_coordinates(self):
+        from apps.activities.services import signup_activity
+        signup_activity(self.member, self.activity)
+        response = self.client.get("/api/activities/my-signups", **self.headers)
+        self.assertEqual(response.status_code, 200)
+        item = response.json()["data"]["items"][0]
+        self.assertAlmostEqual(item["latitude"], 39.908823, places=6)
+        self.assertAlmostEqual(item["longitude"], 116.397470, places=6)
+
+
+class UserMerchantCoordinateTests(TestCase):
+    def setUp(self):
+        self.member = create_member()
+        self.headers = auth_header("member", self.member.openid)
+        self.merchant = Merchant.objects.create(
+            openid="merchant-with-coords",
+            name="坐标商户",
+            address="天安门",
+            latitude=39.908823,
+            longitude=116.397470,
+            is_active=True,
+        )
+        self.merchant_no_coords = Merchant.objects.create(
+            openid="merchant-no-coords",
+            name="无坐标商户",
+            is_active=True,
+        )
+
+    def test_public_merchant_list_returns_coordinates(self):
+        response = self.client.get("/api/merchants", **self.headers)
+        self.assertEqual(response.status_code, 200)
+        items = response.json()["data"]["items"]
+        coord_item = next(i for i in items if i["id"] == self.merchant.id)
+        self.assertAlmostEqual(coord_item["latitude"], 39.908823, places=6)
+        self.assertAlmostEqual(coord_item["longitude"], 116.397470, places=6)
+        no_coord_item = next(i for i in items if i["id"] == self.merchant_no_coords.id)
+        self.assertIsNone(no_coord_item["latitude"])
+        self.assertIsNone(no_coord_item["longitude"])

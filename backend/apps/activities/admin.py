@@ -9,7 +9,7 @@ from shared.admin import BackendManagerAdminMixin, admin_image_preview
 
 @admin.register(Activity)
 class ActivityAdmin(BackendManagerAdminMixin):
-    list_display = ("id", "title", "location", "status", "points", "start_time", "end_time")
+    list_display = ("id", "title", "location", "latitude", "longitude", "status", "points", "start_time", "end_time")
     list_filter = ("status", "start_time", "end_time")
     search_fields = ("title", "location")
     readonly_fields = ("checkin_code", "checkin_qr_image", "checkin_qr_preview", "created_at")
