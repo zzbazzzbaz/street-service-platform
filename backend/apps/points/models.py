@@ -90,7 +90,7 @@ class PointExchangeRule(models.Model):
 
 class ManualPointAdjustment(models.Model):
     member = models.ForeignKey("members.Member", on_delete=models.CASCADE, related_name="manual_point_adjustments", verbose_name="用户")
-    amount = models.PositiveIntegerField("积分值")
+    amount = models.IntegerField("积分变动值")
     reason = models.CharField("原因", max_length=255)
     operator = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -110,18 +110,22 @@ class ManualPointAdjustment(models.Model):
 
     class Meta:
         db_table = "points_manual_adjustment"
-        verbose_name = "人工加分"
-        verbose_name_plural = "人工加分"
+        verbose_name = "人工调整"
+        verbose_name_plural = "人工调整"
         ordering = ("-created_at", "-id")
 
     def save(self, *args, **kwargs):
         is_new = self.pk is None
         super().save(*args, **kwargs)
         if is_new and self.point_record_id is None:
-            from apps.points.services import manual_add_points
+            from apps.points.services import manual_add_points, manual_deduct_points
 
-            self.point_record = manual_add_points(self.member, self.amount, reason=self.reason, operator=self.operator)
+            if self.amount > 0:
+                self.point_record = manual_add_points(self.member, self.amount, reason=self.reason, operator=self.operator)
+            else:
+                self.point_record = manual_deduct_points(self.member, -self.amount, reason=self.reason, operator=self.operator)
             super().save(update_fields=["point_record"])
 
     def __str__(self) -> str:
-        return f"{self.member} +{self.amount}"
+        sign = "+" if self.amount >= 0 else ""
+        return f"{self.member} {sign}{self.amount}"

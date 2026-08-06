@@ -793,14 +793,15 @@ def manual_adjustment_data(adjustment: ManualPointAdjustment) -> dict:
     }
 
 
+@transaction.atomic
 def create_manual_adjustment(payload, operator) -> dict:
     member = get_or_404(Member, payload.member_id)
     if not member.is_active:
         raise BusinessError("用户已停用")
-    if payload.amount <= 0:
-        raise BusinessError("积分值必须大于 0")
+    if payload.amount == 0:
+        raise BusinessError("积分变动值不能为 0")
     if not payload.reason.strip():
-        raise BusinessError("人工加分原因不能为空")
+        raise BusinessError("人工调整原因不能为空")
     adjustment = ManualPointAdjustment.objects.create(member=member, amount=payload.amount, reason=payload.reason.strip(), operator=operator)
     return manual_adjustment_data(adjustment)
 

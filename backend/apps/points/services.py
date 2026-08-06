@@ -126,6 +126,20 @@ def manual_add_points(member: Member, amount: int, *, reason: str, operator) -> 
     )
 
 
+def manual_deduct_points(member: Member, amount: int, *, reason: str, operator) -> PointRecord:
+    if operator is None:
+        raise BusinessError("人工扣分必须记录操作人")
+    if not reason.strip():
+        raise BusinessError("人工扣分原因不能为空")
+    return deduct_points(
+        member,
+        amount,
+        source_type=PointRecord.SourceType.MANUAL,
+        reason=reason,
+        operator=operator,
+    )
+
+
 def point_record_data(record: PointRecord) -> dict:
     return {
         "id": record.id,
