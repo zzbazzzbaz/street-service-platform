@@ -261,6 +261,8 @@ class MerchantIn(Schema):
     contact_name: str = ""
     phone: str = ""
     address: str = ""
+    latitude: float | None = None
+    longitude: float | None = None
     is_active: bool = True
 
 
@@ -270,6 +272,8 @@ class MerchantUpdateIn(Schema):
     contact_name: str | None = None
     phone: str | None = None
     address: str | None = None
+    latitude: float | None = None
+    longitude: float | None = None
     is_active: bool | None = None
 
 

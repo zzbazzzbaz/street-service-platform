@@ -851,12 +851,15 @@ def create_merchant(payload) -> Merchant:
     if not payload.name.strip():
         raise BusinessError("商户名称不能为空")
     validate_merchant_unique(payload.openid)
+    validate_coordinates(payload.latitude, payload.longitude)
     return Merchant.objects.create(
         openid=payload.openid.strip(),
         name=payload.name.strip(),
         contact_name=payload.contact_name.strip(),
         phone=payload.phone.strip(),
         address=payload.address.strip(),
+        latitude=payload.latitude,
+        longitude=payload.longitude,
         is_active=payload.is_active,
     )
 
@@ -870,6 +873,10 @@ def update_merchant(merchant_id: int, payload) -> Merchant:
         value = getattr(payload, field)
         if value is not None:
             setattr(merchant, field, value.strip() if isinstance(value, str) else value)
+    if payload.latitude is not None or payload.longitude is not None:
+        validate_coordinates(payload.latitude, payload.longitude)
+        merchant.latitude = payload.latitude
+        merchant.longitude = payload.longitude
     if not merchant.name.strip():
         raise BusinessError("商户名称不能为空")
     merchant.save()

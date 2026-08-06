@@ -21,6 +21,8 @@ class MerchantOut(Schema):
     contact_name: str
     phone: str
     address: str
+    latitude: float | None = None
+    longitude: float | None = None
     is_active: bool
 
 
@@ -37,6 +39,8 @@ class PublicMerchantOut(Schema):
     contact_name: str
     phone: str
     address: str
+    latitude: float | None = None
+    longitude: float | None = None
     is_active: bool
 
 

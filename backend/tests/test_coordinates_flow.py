@@ -127,3 +127,99 @@ class AdminActivityCoordinateTests(TestCase):
         data = detail_resp.json()["data"]
         self.assertAlmostEqual(data["latitude"], 39.908823, places=6)
         self.assertAlmostEqual(data["longitude"], 116.397470, places=6)
+
+
+class AdminMerchantCoordinateTests(TestCase):
+    def setUp(self):
+        self.admin = create_admin_user()
+        self.headers = admin_auth_header(self.admin)
+
+    def test_admin_create_merchant_with_coordinates(self):
+        response = self.client.post(
+            "/api/admin/merchants",
+            {"name": "带坐标商户", "address": "天安门", "latitude": 39.908823, "longitude": 116.397470, "is_active": True},
+            content_type="application/json",
+            **self.headers,
+        )
+        self.assertEqual(response.status_code, 200)
+        data = response.json()["data"]
+        self.assertAlmostEqual(data["latitude"], 39.908823, places=6)
+        self.assertAlmostEqual(data["longitude"], 116.397470, places=6)
+
+    def test_admin_create_merchant_without_coordinates_returns_null(self):
+        response = self.client.post(
+            "/api/admin/merchants",
+            {"name": "无坐标商户", "is_active": True},
+            content_type="application/json",
+            **self.headers,
+        )
+        self.assertEqual(response.status_code, 200)
+        data = response.json()["data"]
+        self.assertIsNone(data["latitude"])
+        self.assertIsNone(data["longitude"])
+
+    def test_admin_create_merchant_rejects_latitude_only(self):
+        response = self.client.post(
+            "/api/admin/merchants",
+            {"name": "半坐标商户", "latitude": 39.9},
+            content_type="application/json",
+            **self.headers,
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("同时", response.json()["message"])
+
+    def test_admin_create_merchant_rejects_invalid_range(self):
+        response = self.client.post(
+            "/api/admin/merchants",
+            {"name": "超范围商户", "latitude": 91, "longitude": 116},
+            content_type="application/json",
+            **self.headers,
+        )
+        self.assertEqual(response.status_code, 400)
+
+    def test_admin_patch_merchant_updates_coordinates(self):
+        create_resp = self.client.post(
+            "/api/admin/merchants",
+            {"name": "PATCH商户", "is_active": True},
+            content_type="application/json",
+            **self.headers,
+        )
+        merchant_id = create_resp.json()["data"]["id"]
+        patch_resp = self.client.patch(
+            f"/api/admin/merchants/{merchant_id}",
+            {"latitude": 39.908823, "longitude": 116.397470},
+            content_type="application/json",
+            **self.headers,
+        )
+        self.assertEqual(patch_resp.status_code, 200)
+        data = patch_resp.json()["data"]
+        self.assertAlmostEqual(data["latitude"], 39.908823, places=6)
+
+    def test_admin_patch_merchant_rejects_single_coordinate(self):
+        create_resp = self.client.post(
+            "/api/admin/merchants",
+            {"name": "PATCH校验商户", "is_active": True},
+            content_type="application/json",
+            **self.headers,
+        )
+        merchant_id = create_resp.json()["data"]["id"]
+        patch_resp = self.client.patch(
+            f"/api/admin/merchants/{merchant_id}",
+            {"longitude": 116.4},
+            content_type="application/json",
+            **self.headers,
+        )
+        self.assertEqual(patch_resp.status_code, 400)
+
+    def test_admin_merchant_detail_returns_coordinates(self):
+        create_resp = self.client.post(
+            "/api/admin/merchants",
+            {"name": "详情商户", "address": "天安门", "latitude": 39.908823, "longitude": 116.397470, "is_active": True},
+            content_type="application/json",
+            **self.headers,
+        )
+        merchant_id = create_resp.json()["data"]["id"]
+        detail_resp = self.client.get(f"/api/admin/merchants/{merchant_id}", **self.headers)
+        self.assertEqual(detail_resp.status_code, 200)
+        data = detail_resp.json()["data"]
+        self.assertAlmostEqual(data["latitude"], 39.908823, places=6)

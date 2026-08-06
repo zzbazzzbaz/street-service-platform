@@ -30,6 +30,8 @@ def merchant_data(merchant: Merchant) -> dict:
         "contact_name": merchant.contact_name,
         "phone": merchant.phone,
         "address": merchant.address,
+        "latitude": merchant.latitude,
+        "longitude": merchant.longitude,
         "is_active": merchant.is_active,
     }
 
@@ -41,6 +43,8 @@ def public_merchant_data(merchant: Merchant) -> dict:
         "contact_name": merchant.contact_name,
         "phone": merchant.phone,
         "address": merchant.address,
+        "latitude": merchant.latitude,
+        "longitude": merchant.longitude,
         "is_active": merchant.is_active,
     }
 
