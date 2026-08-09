@@ -56,3 +56,19 @@ class ActivityTypeApiTests(TestCase):
         )
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["data"]["activity_type"], "offline")
+
+
+class ActivityEndedSignupTests(TestCase):
+    def test_cannot_signup_ended_activity(self):
+        member = create_member(openid="ended-member")
+        headers = auth_header("member", member.openid)
+        now = timezone.now()
+        activity = Activity.objects.create(
+            title="已结束活动", activity_type="volunteer", status=Activity.Status.PUBLISHED,
+            start_time=now - timezone.timedelta(hours=2),
+            end_time=now - timezone.timedelta(hours=1),
+        )
+        response = self.client.post(f"/api/activities/{activity.id}/signup", **headers)
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("结束", response.json()["message"])
+        self.assertFalse(activity.signups.exists())

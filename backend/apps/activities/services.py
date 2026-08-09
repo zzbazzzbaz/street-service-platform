@@ -90,6 +90,8 @@ def checkin_data(checkin: ActivityCheckin) -> dict:
 def signup_activity(member: Member, activity: Activity) -> ActivitySignup:
     if activity.status != Activity.Status.PUBLISHED:
         raise BusinessError("活动未发布")
+    if activity.end_time <= timezone.now():
+        raise BusinessError("活动已结束，无法报名")
     if ActivitySignup.objects.filter(member=member, activity=activity).exists():
         raise BusinessError("重复报名")
     return ActivitySignup.objects.create(member=member, activity=activity)
