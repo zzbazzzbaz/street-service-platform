@@ -2,6 +2,14 @@ from django.db import models
 
 
 class Merchant(models.Model):
+    class CategoryCode(models.TextChoices):
+        FOOD = "food", "餐饮商户"
+        RETAIL = "retail", "零售商超"
+        REPAIR = "repair", "维修服务"
+        HEALTHCARE = "healthcare", "医药健康"
+        LIFE_SERVICE = "life_service", "生活服务"
+        OTHER = "other", "其他"
+
     openid = models.CharField("OpenID", max_length=128, unique=True)
     name = models.CharField("商户名称", max_length=100)
     contact_name = models.CharField("联系人", max_length=50, blank=True)
@@ -9,6 +17,14 @@ class Merchant(models.Model):
     address = models.CharField("经营地址", max_length=255, blank=True)
     latitude = models.FloatField("纬度", null=True, blank=True)
     longitude = models.FloatField("经度", null=True, blank=True)
+    category_code = models.CharField(
+        "商户分类",
+        max_length=32,
+        choices=CategoryCode.choices,
+        default=CategoryCode.OTHER,
+    )
+    business_hours = models.CharField("营业时间", max_length=100, blank=True)
+    service_content = models.TextField("服务内容", blank=True)
     is_active = models.BooleanField("是否启用", default=True)
     created_at = models.DateTimeField("创建时间", auto_now_add=True)
 
