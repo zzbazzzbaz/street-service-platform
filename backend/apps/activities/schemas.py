@@ -14,6 +14,7 @@ class ActivityOut(Schema):
     end_time: datetime
     points: int
     status: str
+    activity_type: str
     user_signup_id: int | None = None
     signup_status: str = "not_joined"
     checkin_status: str = "not_checked"
@@ -38,6 +39,7 @@ class ActivitySignupOut(Schema):
     start_time: datetime
     end_time: datetime
     points: int
+    activity_type: str
     signup_status: str
     created_at: datetime
     cancelled_at: datetime | None = None

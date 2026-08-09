@@ -15,14 +15,19 @@ router = Router(tags=["活动"])
 
 
 @router.get("", response={200: SuccessResponse[ActivitiesData], 401: ErrorResponse, 403: ErrorResponse})
-def activity_list(request, page: int = 1, page_size: int = 20):
+def activity_list(request, page: int = 1, page_size: int = 20, activity_type: str = ""):
     try:
         member = authenticate_member(request)
     except TokenError as exc:
         return error_response(40001, str(exc), status=401)
     except BusinessError as exc:
         return error_response(exc.code, exc.message, status=exc.status, errors=exc.errors)
-    items, page_data = paginate_queryset(Activity.objects.filter(status=Activity.Status.PUBLISHED), page=page, page_size=page_size)
+    queryset = Activity.objects.filter(status=Activity.Status.PUBLISHED)
+    if activity_type:
+        if activity_type not in Activity.ActivityType.values:
+            return error_response(40000, "活动类型不支持", status=400)
+        queryset = queryset.filter(activity_type=activity_type)
+    items, page_data = paginate_queryset(queryset, page=page, page_size=page_size)
     activity_ids = [item.id for item in items]
     signups = {
         signup.activity_id: signup

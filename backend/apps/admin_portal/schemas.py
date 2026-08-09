@@ -42,6 +42,7 @@ class AdminEnumsOut(Schema):
     civic_feedback_statuses: list[ChoiceItemOut]
     problem_feedback_statuses: list[ChoiceItemOut]
     activity_statuses: list[ChoiceItemOut]
+    activity_types: list[ChoiceItemOut]
     activity_checkin_statuses: list[ChoiceItemOut]
     elder_task_statuses: list[ChoiceItemOut]
     elder_feedback_statuses: list[ChoiceItemOut]
@@ -182,6 +183,7 @@ class ActivityIn(Schema):
     start_time: datetime
     end_time: datetime
     points: int = 0
+    activity_type: str = "volunteer"
     status: str = "draft"
 
 
@@ -194,6 +196,7 @@ class ActivityUpdateIn(Schema):
     start_time: datetime | None = None
     end_time: datetime | None = None
     points: int | None = None
+    activity_type: str | None = None
     status: str | None = None
 
 

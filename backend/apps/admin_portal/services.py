@@ -89,6 +89,7 @@ def enum_data() -> dict:
         "civic_feedback_statuses": _choices(CivicFeedback.Status.choices),
         "problem_feedback_statuses": _choices(ProblemFeedback.Status.choices),
         "activity_statuses": _choices(Activity.Status.choices),
+        "activity_types": _choices(Activity.ActivityType.choices),
         "activity_checkin_statuses": _choices(ActivityCheckin.Status.choices),
         "elder_task_statuses": _choices(ElderServiceTask.Status.choices),
         "elder_feedback_statuses": _choices(ElderServiceFeedback.Status.choices),
@@ -573,6 +574,8 @@ def validate_activity_payload(obj) -> None:
         raise BusinessError("标题不能为空")
     if obj.status not in Activity.Status.values:
         raise BusinessError("活动状态不支持")
+    if obj.activity_type not in Activity.ActivityType.values:
+        raise BusinessError("活动类型不支持")
     if obj.points < 0:
         raise BusinessError("积分值必须为非负整数")
     if obj.end_time <= obj.start_time:
@@ -591,13 +594,14 @@ def create_activity(payload) -> Activity:
         start_time=payload.start_time,
         end_time=payload.end_time,
         points=payload.points,
+        activity_type=payload.activity_type,
         status=payload.status,
     )
 
 
 def update_activity(activity_id: int, payload) -> Activity:
     activity = get_or_404(Activity, activity_id)
-    for field in ["title", "body", "location", "start_time", "end_time", "points", "status"]:
+    for field in ["title", "body", "location", "activity_type", "start_time", "end_time", "points", "status"]:
         value = getattr(payload, field)
         if value is not None:
             setattr(activity, field, value.strip() if isinstance(value, str) else value)
