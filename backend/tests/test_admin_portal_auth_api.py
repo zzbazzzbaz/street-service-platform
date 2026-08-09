@@ -137,7 +137,7 @@ class AdminPortalAuthApiTests(TestCase):
         self.assertIn({"value": "courier", "label": "小哥"}, data["member_identity_types"])
         self.assertIn({"value": "pending", "label": "待审核"}, data["member_audit_statuses"])
         self.assertIn({"value": "article", "label": "图文文章"}, data["learning_content_types"])
-        self.assertIn({"value": "road_light", "label": "路灯损坏"}, data["report_category_codes"])
+        self.assertIn({"value": "safety_hazard", "label": "安全隐患"}, data["report_category_codes"])
         self.assertIn({"value": "merchant_payment", "label": "商户积分支付"}, data["point_source_types"])
         self.assertIn({"value": "processed", "label": "已处理"}, data["merchant_settlement_statuses"])
 

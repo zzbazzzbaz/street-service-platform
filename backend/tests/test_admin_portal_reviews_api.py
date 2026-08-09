@@ -19,7 +19,7 @@ class AdminPortalReviewsApiTests(TestCase):
         list_response = self.client.get("/api/admin/reports?keyword=李明&status=pending", **self.headers)
         update_response = self.client.patch(
             f"/api/admin/reports/{report.id}",
-            {"category_code": "road_light", "description": "补充描述", "location": "小区门口", "points": 6, "image_urls": ["https://example.com/a.png"]},
+            {"category_code": "safety_hazard", "description": "补充描述", "location": "小区门口", "points": 6, "image_urls": ["https://example.com/a.png"]},
             content_type="application/json",
             **self.headers,
         )

@@ -3,12 +3,11 @@ from django.db import models
 
 class Report(models.Model):
     class CategoryCode(models.TextChoices):
-        ROAD_LIGHT = "road_light", "路灯损坏"
-        WELL_COVER = "well_cover", "井盖问题"
-        WATER_LEAK = "water_leak", "管道漏水"
-        ROAD_DAMAGE = "road_damage", "道路破损"
-        TREE_FALL = "tree_fall", "树木倒伏"
+        SAFETY_HAZARD = "safety_hazard", "安全隐患"
+        ENVIRONMENTAL_HYGIENE = "environmental_hygiene", "环境卫生"
+        PUBLIC_FACILITY = "public_facility", "公共设施"
         OTHER = "other", "其他"
+        GOOD_DEED = "good_deed", "爱心善举"
 
     class Status(models.TextChoices):
         PENDING = "pending", "待审核"

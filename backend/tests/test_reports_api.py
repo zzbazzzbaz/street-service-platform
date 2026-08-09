@@ -12,7 +12,7 @@ class ReportsApiTests(TestCase):
         response = self.client.post(
             "/api/reports",
             {
-                "category_code": "road_light",
+                "category_code": "safety_hazard",
                 "description": "路口路灯夜间不亮",
                 "location": "椿树街道东口",
                 "image_urls": ["https://example.com/media/uploads/report/a.png"],
@@ -23,12 +23,12 @@ class ReportsApiTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         data = response.json()["data"]
-        self.assertEqual(data["category_code"], "road_light")
-        self.assertEqual(data["title"], "路灯损坏")
+        self.assertEqual(data["category_code"], "safety_hazard")
+        self.assertEqual(data["title"], "安全隐患")
         self.assertEqual(data["image_urls"], ["https://example.com/media/uploads/report/a.png"])
         self.assertNotIn("image", data)
         report = Report.objects.get(pk=data["id"])
-        self.assertEqual(report.title, "路灯损坏")
+        self.assertEqual(report.title, "安全隐患")
 
     def test_unapproved_member_cannot_submit_report(self):
         member = create_member(audit_status=Member.AuditStatus.PENDING)
@@ -36,7 +36,7 @@ class ReportsApiTests(TestCase):
         response = self.client.post(
             "/api/reports",
             {
-                "category_code": "road_light",
+                "category_code": "safety_hazard",
                 "location": "椿树街道东口",
                 "image_urls": ["https://example.com/a.png"],
             },
@@ -77,8 +77,8 @@ class ReportsApiTests(TestCase):
         other = create_member(openid="other-openid", audit_status=Member.AuditStatus.APPROVED)
         my_pending = Report.objects.create(
             member=member,
-            category_code=Report.CategoryCode.ROAD_LIGHT,
-            title="路灯损坏",
+            category_code=Report.CategoryCode.SAFETY_HAZARD,
+            title="安全隐患",
             location="路口",
             image_urls=["https://example.com/a.png"],
         )
@@ -92,8 +92,8 @@ class ReportsApiTests(TestCase):
         )
         Report.objects.create(
             member=other,
-            category_code=Report.CategoryCode.ROAD_LIGHT,
-            title="路灯损坏",
+            category_code=Report.CategoryCode.SAFETY_HAZARD,
+            title="安全隐患",
             location="路口",
             image_urls=["https://example.com/c.png"],
         )
@@ -108,4 +108,4 @@ class ReportsApiTests(TestCase):
         data = response.json()["data"]
         self.assertEqual(data["total"], 1)
         self.assertEqual(data["items"][0]["id"], my_pending.id)
-        self.assertEqual(data["items"][0]["category_code"], "road_light")
+        self.assertEqual(data["items"][0]["category_code"], "safety_hazard")
