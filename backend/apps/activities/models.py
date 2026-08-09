@@ -14,6 +14,10 @@ class Activity(models.Model):
         PUBLISHED = "published", "已发布"
         CLOSED = "closed", "已关闭"
 
+    class ActivityType(models.TextChoices):
+        VOLUNTEER = "volunteer", "志愿任务"
+        OFFLINE = "offline", "线下活动"
+
     title = models.CharField("标题", max_length=120)
     body = models.TextField("正文", blank=True)
     location = models.CharField("地点", max_length=255, blank=True)
@@ -23,6 +27,12 @@ class Activity(models.Model):
     end_time = models.DateTimeField("结束时间")
     points = models.PositiveIntegerField("积分值", default=0)
     status = models.CharField("状态", max_length=20, choices=Status.choices, default=Status.DRAFT)
+    activity_type = models.CharField(
+        "活动类型",
+        max_length=20,
+        choices=ActivityType.choices,
+        default=ActivityType.VOLUNTEER,
+    )
     checkin_code = models.CharField("签到码", max_length=64, unique=True, blank=True)
     checkin_qr_image = models.ImageField("签到二维码", upload_to="activities/qrcodes/", blank=True)
     created_at = models.DateTimeField("创建时间", auto_now_add=True)
