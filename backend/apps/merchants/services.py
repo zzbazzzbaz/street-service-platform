@@ -32,6 +32,9 @@ def merchant_data(merchant: Merchant) -> dict:
         "address": merchant.address,
         "latitude": merchant.latitude,
         "longitude": merchant.longitude,
+        "category_code": merchant.category_code,
+        "business_hours": merchant.business_hours,
+        "service_content": merchant.service_content,
         "is_active": merchant.is_active,
     }
 
@@ -45,6 +48,9 @@ def public_merchant_data(merchant: Merchant) -> dict:
         "address": merchant.address,
         "latitude": merchant.latitude,
         "longitude": merchant.longitude,
+        "category_code": merchant.category_code,
+        "business_hours": merchant.business_hours,
+        "service_content": merchant.service_content,
         "is_active": merchant.is_active,
     }
 

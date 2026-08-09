@@ -49,6 +49,7 @@ class AdminEnumsOut(Schema):
     point_source_types: list[ChoiceItemOut]
     merchant_settlement_period_types: list[ChoiceItemOut]
     merchant_settlement_statuses: list[ChoiceItemOut]
+    merchant_category_codes: list[ChoiceItemOut]
 
 
 class AdminDashboardSummaryOut(Schema):
@@ -263,6 +264,9 @@ class MerchantIn(Schema):
     address: str = ""
     latitude: float | None = None
     longitude: float | None = None
+    category_code: str = "other"
+    business_hours: str = ""
+    service_content: str = ""
     is_active: bool = True
 
 
@@ -274,6 +278,9 @@ class MerchantUpdateIn(Schema):
     address: str | None = None
     latitude: float | None = None
     longitude: float | None = None
+    category_code: str | None = None
+    business_hours: str | None = None
+    service_content: str | None = None
     is_active: bool | None = None
 
 

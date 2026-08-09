@@ -96,6 +96,7 @@ def enum_data() -> dict:
         "point_source_types": _choices(PointRecord.SourceType.choices),
         "merchant_settlement_period_types": _choices(MerchantSettlement.PeriodType.choices),
         "merchant_settlement_statuses": _choices(MerchantSettlement.Status.choices),
+        "merchant_category_codes": _choices(Merchant.CategoryCode.choices),
     }
 
 
@@ -848,11 +849,42 @@ def validate_merchant_unique(openid: str, *, exclude_id: int | None = None) -> N
             raise BusinessError("商户 openid 已存在")
 
 
+def validate_merchant_category(category_code: str) -> str:
+    category_code = (category_code or "").strip()
+    if category_code and category_code not in Merchant.CategoryCode.values:
+        raise BusinessError(
+            "商户分类不在允许范围内",
+            errors={"category_code": ["无效的商户分类"]},
+        )
+    return category_code or Merchant.CategoryCode.OTHER
+
+
+def clean_business_hours(value: str) -> str:
+    value = (value or "").strip()
+    if len(value) > 100:
+        raise BusinessError(
+            "营业时间超出长度限制",
+            errors={"business_hours": ["营业时间最多 100 字"]},
+        )
+    return value
+
+
+def clean_service_content(value: str) -> str:
+    value = (value or "").strip()
+    if len(value) > 500:
+        raise BusinessError(
+            "服务内容超出长度限制",
+            errors={"service_content": ["服务内容最多 500 字"]},
+        )
+    return value
+
+
 def create_merchant(payload) -> Merchant:
     if not payload.name.strip():
         raise BusinessError("商户名称不能为空")
     validate_merchant_unique(payload.openid)
     validate_coordinates(payload.latitude, payload.longitude)
+    category_code = validate_merchant_category(payload.category_code)
     return Merchant.objects.create(
         openid=payload.openid.strip(),
         name=payload.name.strip(),
@@ -861,6 +893,9 @@ def create_merchant(payload) -> Merchant:
         address=payload.address.strip(),
         latitude=payload.latitude,
         longitude=payload.longitude,
+        category_code=category_code,
+        business_hours=clean_business_hours(payload.business_hours),
+        service_content=clean_service_content(payload.service_content),
         is_active=payload.is_active,
     )
 
@@ -870,10 +905,12 @@ def update_merchant(merchant_id: int, payload) -> Merchant:
     if payload.openid is not None:
         validate_merchant_unique(payload.openid, exclude_id=merchant.id)
         merchant.openid = payload.openid.strip()
-    for field in ["name", "contact_name", "phone", "address", "is_active"]:
+    for field in ["name", "contact_name", "phone", "address", "business_hours", "service_content", "is_active"]:
         value = getattr(payload, field)
         if value is not None:
             setattr(merchant, field, value.strip() if isinstance(value, str) else value)
+    if payload.category_code is not None:
+        merchant.category_code = validate_merchant_category(payload.category_code)
     if payload.latitude is not None or payload.longitude is not None:
         validate_coordinates(payload.latitude, payload.longitude)
         merchant.latitude = payload.latitude

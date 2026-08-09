@@ -23,6 +23,9 @@ class MerchantOut(Schema):
     address: str
     latitude: float | None = None
     longitude: float | None = None
+    category_code: str
+    business_hours: str
+    service_content: str
     is_active: bool
 
 
@@ -41,6 +44,9 @@ class PublicMerchantOut(Schema):
     address: str
     latitude: float | None = None
     longitude: float | None = None
+    category_code: str
+    business_hours: str
+    service_content: str
     is_active: bool
 
 
