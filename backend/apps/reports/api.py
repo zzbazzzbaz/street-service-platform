@@ -33,7 +33,7 @@ def create_report(request, payload: ReportIn):
 
 
 @router.get("", response={200: SuccessResponse[ReportsData], 401: ErrorResponse, 403: ErrorResponse})
-def my_reports(request, page: int = 1, page_size: int = 20, status: str = ""):
+def my_reports(request, page: int = 1, page_size: int = 20, status: str = "", report_type: str = ""):
     try:
         member = authenticate_member(request)
     except TokenError as exc:
@@ -43,6 +43,13 @@ def my_reports(request, page: int = 1, page_size: int = 20, status: str = ""):
     queryset = member.reports.all()
     if status:
         queryset = queryset.filter(status=status)
+    if report_type:
+        if report_type == "report":
+            queryset = queryset.exclude(category_code=Report.CategoryCode.GOOD_DEED)
+        elif report_type == "good_deed":
+            queryset = queryset.filter(category_code=Report.CategoryCode.GOOD_DEED)
+        else:
+            return error_response(40000, "report_type 取值必须为 report 或 good_deed", status=400)
     items, page_data = paginate_queryset(queryset, page=page, page_size=page_size)
     return success_response({"items": [report_data(item, request=request) for item in items], **page_data})
 
