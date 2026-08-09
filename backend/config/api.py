@@ -16,6 +16,7 @@ from apps.merchants.api import merchant_auth_router, merchant_router, public_mer
 from apps.points.api import router as points_router
 from apps.problem_feedbacks.api import router as problem_feedbacks_router
 from apps.reports.api import router as reports_router
+from apps.service_records.api import router as service_records_router
 from shared.api import ErrorResponse, error_response
 from shared.api import SuccessResponse, success_response
 from shared.exceptions import BusinessError
@@ -82,6 +83,7 @@ api.add_router("/problem-feedbacks", problem_feedbacks_router)
 api.add_router("/activities", activities_router)
 api.add_router("/elder-services", elder_services_router)
 api.add_router("/points", points_router)
+api.add_router("/service-records", service_records_router)
 api.add_router("/merchants", public_merchant_router)
 api.add_router("/merchant/auth", merchant_auth_router)
 api.add_router("/merchant", merchant_router)

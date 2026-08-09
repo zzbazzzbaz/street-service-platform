@@ -48,6 +48,7 @@ INSTALLED_APPS = [
     "apps.elder_services",
     "apps.points",
     "apps.merchants",
+    "apps.service_records",
 ]
 
 MIDDLEWARE = [
