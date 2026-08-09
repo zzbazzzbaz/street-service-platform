@@ -107,7 +107,7 @@ class LearningReportsElderFlowTests(TestCase):
     def test_report_review_approve_awards_points_and_reject_does_not(self):
         approved = submit_report(
             self.member,
-            category_code=Report.CategoryCode.WELL_COVER,
+            category_code=Report.CategoryCode.ENVIRONMENTAL_HYGIENE,
             description="描述",
             location="路口",
             image_urls=["https://example.com/a.png"],

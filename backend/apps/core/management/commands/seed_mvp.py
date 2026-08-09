@@ -229,7 +229,7 @@ class Command(BaseCommand):
             member=member,
             title="路灯故障上报",
             defaults={
-                "category_code": Report.CategoryCode.ROAD_LIGHT,
+                "category_code": Report.CategoryCode.SAFETY_HAZARD,
                 "description": "幸福小区 3 号楼旁路灯夜间不亮，影响居民通行。",
                 "location": "幸福小区 3 号楼",
                 "image_urls": ["https://example.com/media/uploads/report/seed-light.png"],
