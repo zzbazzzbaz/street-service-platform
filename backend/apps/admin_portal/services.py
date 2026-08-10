@@ -601,6 +601,9 @@ def create_activity(payload) -> Activity:
 
 def update_activity(activity_id: int, payload) -> Activity:
     activity = get_or_404(Activity, activity_id)
+    if payload.activity_type is not None and payload.activity_type != activity.activity_type:
+        if activity.signups.exists() or activity.checkins.exists():
+            raise BusinessError("活动已有报名或签到记录，不能修改活动类型")
     for field in ["title", "body", "location", "activity_type", "start_time", "end_time", "points", "status"]:
         value = getattr(payload, field)
         if value is not None:

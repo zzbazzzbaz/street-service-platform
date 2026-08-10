@@ -69,6 +69,7 @@ class ActivityCheckinIn(Schema):
 class ActivityCheckinOut(Schema):
     id: int
     activity_id: int
+    activity_type: str
     status: str
     review_comment: str
     point_record_id: int | None = None

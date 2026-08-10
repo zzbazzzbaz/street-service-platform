@@ -470,10 +470,15 @@ def admin_problem_feedback_visibility(request, feedback_id: int, payload: Visibi
 
 
 @router.get("/activities/signups", response={200: SuccessResponse[dict], 401: ErrorResponse, 403: ErrorResponse})
-def admin_activity_signups(request, page: int = 1, page_size: int = 20):
+def admin_activity_signups(request, activity_type: str = "", page: int = 1, page_size: int = 20):
     try:
         _admin_or_error(request)
-        return success_response(svc.paginated_data(ActivitySignup.objects.select_related("member", "activity"), svc.signup_admin_data, page=page, page_size=page_size))
+        queryset = ActivitySignup.objects.select_related("member", "activity")
+        if activity_type:
+            if activity_type not in Activity.ActivityType.values:
+                raise BusinessError("活动类型不支持")
+            queryset = queryset.filter(activity__activity_type=activity_type)
+        return success_response(svc.paginated_data(queryset, svc.signup_admin_data, page=page, page_size=page_size))
     except BusinessError as exc:
         return _business_error(exc)
 
@@ -488,10 +493,15 @@ def admin_activity_signup_detail(request, signup_id: int):
 
 
 @router.get("/activities/checkins", response={200: SuccessResponse[dict], 401: ErrorResponse, 403: ErrorResponse})
-def admin_activity_checkins(request, page: int = 1, page_size: int = 20):
+def admin_activity_checkins(request, activity_type: str = "", page: int = 1, page_size: int = 20):
     try:
         _admin_or_error(request)
-        return success_response(svc.paginated_data(ActivityCheckin.objects.select_related("member", "activity"), svc.checkin_admin_data, page=page, page_size=page_size))
+        queryset = ActivityCheckin.objects.select_related("member", "activity")
+        if activity_type:
+            if activity_type not in Activity.ActivityType.values:
+                raise BusinessError("活动类型不支持")
+            queryset = queryset.filter(activity__activity_type=activity_type)
+        return success_response(svc.paginated_data(queryset, svc.checkin_admin_data, page=page, page_size=page_size))
     except BusinessError as exc:
         return _business_error(exc)
 
@@ -515,12 +525,16 @@ def admin_activity_checkin_review(request, checkin_id: int, payload: ReviewIn):
 
 
 @router.get("/activities", response={200: SuccessResponse[dict], 401: ErrorResponse, 403: ErrorResponse})
-def admin_activities(request, status: str = "", page: int = 1, page_size: int = 20):
+def admin_activities(request, status: str = "", activity_type: str = "", page: int = 1, page_size: int = 20):
     try:
         _admin_or_error(request)
         queryset = Activity.objects.all()
         if status:
             queryset = queryset.filter(status=status)
+        if activity_type:
+            if activity_type not in Activity.ActivityType.values:
+                raise BusinessError("活动类型不支持")
+            queryset = queryset.filter(activity_type=activity_type)
         return success_response(svc.paginated_data(queryset, lambda item: activity_data(item, include_checkin_secret=True), page=page, page_size=page_size))
     except BusinessError as exc:
         return _business_error(exc)

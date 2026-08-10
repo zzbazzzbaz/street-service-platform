@@ -80,6 +80,7 @@ def checkin_data(checkin: ActivityCheckin) -> dict:
     return {
         "id": checkin.id,
         "activity_id": checkin.activity_id,
+        "activity_type": checkin.activity.activity_type,
         "status": checkin.status,
         "review_comment": checkin.review_comment,
         "point_record_id": checkin.point_record_id,

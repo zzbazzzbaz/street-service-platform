@@ -44,7 +44,7 @@ def activity_list(request, page: int = 1, page_size: int = 20, activity_type: st
 
 
 @router.get("/my-signups", response={200: SuccessResponse[ActivitySignupsData], 401: ErrorResponse, 403: ErrorResponse})
-def my_activity_signups(request, page: int = 1, page_size: int = 20):
+def my_activity_signups(request, page: int = 1, page_size: int = 20, activity_type: str = ""):
     try:
         member = authenticate_member(request)
     except TokenError as exc:
@@ -52,6 +52,10 @@ def my_activity_signups(request, page: int = 1, page_size: int = 20):
     except BusinessError as exc:
         return error_response(exc.code, exc.message, status=exc.status, errors=exc.errors)
     queryset = member.activity_signups.select_related("activity", "member")
+    if activity_type:
+        if activity_type not in Activity.ActivityType.values:
+            return error_response(40000, "活动类型不支持", status=400)
+        queryset = queryset.filter(activity__activity_type=activity_type)
     items, page_data = paginate_queryset(queryset, page=page, page_size=page_size)
     checkins = {
         checkin.activity_id: checkin

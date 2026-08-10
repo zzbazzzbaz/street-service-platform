@@ -126,6 +126,8 @@ else:
 AUTH_PASSWORD_VALIDATORS = []
 AUTH_USER_MODEL = "accounts.User"
 
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+
 LANGUAGE_CODE = "zh-hans"
 TIME_ZONE = "Asia/Shanghai"
 USE_I18N = True
