@@ -132,6 +132,15 @@ class LearningContentStatusIn(Schema):
     is_active: bool
 
 
+class PinnedItemIn(Schema):
+    content_id: int
+    pin_order: int
+
+
+class PinnedItemsIn(Schema):
+    items: list[PinnedItemIn]
+
+
 class ReportUpdateIn(Schema):
     category_code: str | None = None
     title: str | None = None

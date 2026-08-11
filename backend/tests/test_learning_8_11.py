@@ -56,6 +56,82 @@ class AdminLearningAnnouncementTests(TestCase):
         self.assertIsNone(c.pin_order)
 
 
+def _pin_content(title="公告", **kw):
+    defaults = {"is_announcement": True, "is_active": True, "cover": "learning/covers/x.jpg"}
+    defaults.update(kw)
+    return LearningContent.objects.create(title=title, **defaults)
+
+
+class SetPinnedAnnouncementsTests(TestCase):
+    def setUp(self):
+        self.headers = admin_auth_header(create_admin_user())
+
+    def test_set_pinned_normal_overwrite(self):
+        c1 = _pin_content("p1")
+        c2 = _pin_content("p2")
+        c1.is_pinned, c1.pin_order = True, 1
+        c1.save()
+        r = self.client.post(
+            "/api/admin/learning/announcements/pinned",
+            {"items": [{"content_id": c2.id, "pin_order": 1}]},
+            content_type="application/json",
+            **self.headers,
+        )
+        self.assertEqual(r.status_code, 200)
+        body = r.json()["data"]
+        self.assertEqual([i["id"] for i in body], [c2.id])
+        self.assertEqual([i["pin_order"] for i in body], [1])
+        c1.refresh_from_db()
+        self.assertFalse(c1.is_pinned)
+        self.assertIsNone(c1.pin_order)
+
+    def test_set_pinned_empty_clears_all(self):
+        c1 = _pin_content("p1")
+        c1.is_pinned, c1.pin_order = True, 1
+        c1.save()
+        r = self.client.post(
+            "/api/admin/learning/announcements/pinned",
+            {"items": []},
+            content_type="application/json",
+            **self.headers,
+        )
+        self.assertEqual(r.json()["data"], [])
+        c1.refresh_from_db()
+        self.assertFalse(c1.is_pinned)
+        self.assertIsNone(c1.pin_order)
+
+    def test_set_pinned_duplicate_id_rejected(self):
+        c1 = _pin_content("p1")
+        r = self.client.post(
+            "/api/admin/learning/announcements/pinned",
+            {"items": [{"content_id": c1.id, "pin_order": 1}, {"content_id": c1.id, "pin_order": 2}]},
+            content_type="application/json",
+            **self.headers,
+        )
+        self.assertEqual(r.status_code, 400)
+
+    def test_set_pinned_not_announcement_rejected(self):
+        c = LearningContent.objects.create(title="普通")
+        r = self.client.post(
+            "/api/admin/learning/announcements/pinned",
+            {"items": [{"content_id": c.id, "pin_order": 1}]},
+            content_type="application/json",
+            **self.headers,
+        )
+        self.assertEqual(r.status_code, 400)
+
+    def test_set_pinned_order_not_continuous_rejected(self):
+        c1 = _pin_content("p1")
+        c2 = _pin_content("p2")
+        r = self.client.post(
+            "/api/admin/learning/announcements/pinned",
+            {"items": [{"content_id": c1.id, "pin_order": 1}, {"content_id": c2.id, "pin_order": 3}]},
+            content_type="application/json",
+            **self.headers,
+        )
+        self.assertEqual(r.status_code, 400)
+
+
 class PinnedAnnouncementsTests(TestCase):
     def test_pinned_announcements_public_and_ordered(self):
         LearningContent.objects.create(title="p1", is_announcement=True, is_pinned=True, pin_order=1)
