@@ -31,6 +31,10 @@ def content_data(content: LearningContent, request=None, member: Member | None =
         "points": content.points,
         "required_seconds": content.required_seconds,
         "is_active": content.is_active,
+        "is_announcement": content.is_announcement,
+        "is_pinned": content.is_pinned,
+        "pin_order": content.pin_order,
+        "created_at": content.created_at,
         "is_completed": record.is_completed if record is not None else False,
         "completed_at": record.completed_at if record is not None and record.is_completed else None,
     }

@@ -4,6 +4,19 @@ from django.db import IntegrityError, transaction
 from django.test import TestCase
 
 from apps.learning.models import LearningContent
+from apps.learning.services import content_data
+
+
+class LearningContentSerializationTests(TestCase):
+    def test_content_data_returns_new_fields(self):
+        c = LearningContent.objects.create(
+            title="公告", is_announcement=True, is_pinned=True, pin_order=1
+        )
+        data = content_data(c, request=None)
+        self.assertTrue(data["is_announcement"])
+        self.assertTrue(data["is_pinned"])
+        self.assertEqual(data["pin_order"], 1)
+        self.assertIn("created_at", data)
 
 
 class LearningContentAnnouncementModelTests(TestCase):
