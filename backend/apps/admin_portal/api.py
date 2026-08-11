@@ -268,7 +268,7 @@ def admin_learning_record_detail(request, record_id: int):
 
 
 @router.get("/learning/contents", response={200: SuccessResponse[dict], 401: ErrorResponse, 403: ErrorResponse})
-def admin_learning_contents(request, keyword: str = "", status: str = "", page: int = 1, page_size: int = 20):
+def admin_learning_contents(request, keyword: str = "", status: str = "", page: int = 1, page_size: int = 20, is_announcement: bool | None = None, is_active: bool | None = None):
     try:
         _admin_or_error(request)
         queryset = LearningContent.objects.all()
@@ -276,6 +276,10 @@ def admin_learning_contents(request, keyword: str = "", status: str = "", page: 
             queryset = queryset.filter(title__icontains=keyword)
         if status in {"active", "inactive"}:
             queryset = queryset.filter(is_active=status == "active")
+        if is_announcement is not None:
+            queryset = queryset.filter(is_announcement=is_announcement)
+        if is_active is not None:
+            queryset = queryset.filter(is_active=is_active)
         return success_response(svc.paginated_data(queryset, lambda item: svc.learning_content_admin_data(item, request=request), page=page, page_size=page_size))
     except BusinessError as exc:
         return _business_error(exc)
@@ -296,7 +300,10 @@ def admin_learning_content_status(request, content_id: int, payload: LearningCon
         _admin_or_error(request)
         content = svc.get_or_404(LearningContent, content_id)
         content.is_active = payload.is_active
-        content.save(update_fields=["is_active"])
+        if not content.is_active:
+            content.is_pinned = False
+            content.pin_order = None
+        content.save(update_fields=["is_active", "is_pinned", "pin_order"])
         return success_response(svc.learning_content_admin_data(content, request=request))
     except BusinessError as exc:
         return _business_error(exc)

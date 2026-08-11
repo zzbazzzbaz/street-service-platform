@@ -326,6 +326,8 @@ def validate_learning_content_payload(payload) -> None:
         raise BusinessError("内容类型不支持")
     if int(payload.points) < 0 or int(payload.required_seconds) < 0:
         raise BusinessError("积分值和学习秒数必须为非负整数")
+    if getattr(payload, "is_announcement", False) and payload.content_type != "article":
+        raise BusinessError("公告类型内容必须使用图文类型")
 
 
 def create_learning_content(payload) -> LearningContent:
@@ -340,12 +342,13 @@ def create_learning_content(payload) -> LearningContent:
         points=payload.points,
         required_seconds=payload.required_seconds,
         is_active=payload.is_active,
+        is_announcement=payload.is_announcement,
     )
 
 
 def update_learning_content(content_id: int, payload) -> LearningContent:
     content = get_or_404(LearningContent, content_id)
-    for field in ["title", "body", "content_type", "points", "required_seconds", "is_active"]:
+    for field in ["title", "body", "content_type", "points", "required_seconds", "is_active", "is_announcement"]:
         value = getattr(payload, field)
         if value is not None:
             setattr(content, field, value.strip() if isinstance(value, str) else value)
@@ -354,6 +357,9 @@ def update_learning_content(content_id: int, payload) -> LearningContent:
         if value is not None:
             setattr(content, field, _media_field_value(value))
     validate_learning_content_payload(content)
+    if not content.is_announcement or not content.is_active:
+        content.is_pinned = False
+        content.pin_order = None
     content.save()
     return content
 

@@ -5,7 +5,55 @@ from django.test import TestCase
 
 from apps.learning.models import LearningContent
 from apps.learning.services import content_data
-from tests.helpers import auth_header, create_member
+from tests.helpers import admin_auth_header, auth_header, create_admin_user, create_member
+
+
+class AdminLearningAnnouncementTests(TestCase):
+    def setUp(self):
+        self.headers = admin_auth_header(create_admin_user())
+
+    def test_admin_learning_contents_filter(self):
+        LearningContent.objects.create(title="公告", is_announcement=True)
+        LearningContent.objects.create(title="普通", is_announcement=False)
+        r = self.client.get("/api/admin/learning/contents?is_announcement=true", **self.headers)
+        self.assertEqual(r.json()["data"]["total"], 1)
+        self.assertTrue(r.json()["data"]["items"][0]["is_announcement"])
+
+    def test_admin_learning_create_announcement_requires_article(self):
+        payload = {
+            "title": "公告视频",
+            "is_announcement": True,
+            "content_type": "video",
+            "body": "<p>x</p>",
+        }
+        r = self.client.post("/api/admin/learning/contents", payload, content_type="application/json", **self.headers)
+        self.assertEqual(r.status_code, 400)
+
+    def test_admin_learning_create_keeps_body_html(self):
+        payload = {
+            "title": "富文本公告",
+            "is_announcement": True,
+            "content_type": "article",
+            "body": "<h2>标题</h2><p>正文</p><p><img src=\"https://commu.iloveminmeng.com/media/learning/a.jpg\"></p>",
+        }
+        r = self.client.post("/api/admin/learning/contents", payload, content_type="application/json", **self.headers)
+        cid = r.json()["data"]["id"]
+        detail = self.client.get(f"/api/admin/learning/contents/{cid}", **self.headers).json()["data"]
+        self.assertIn("<h2>标题</h2>", detail["body"])
+        self.assertIn("a.jpg", detail["body"])
+        self.assertTrue(detail["is_announcement"])
+
+    def test_admin_learning_status_off_clears_pin(self):
+        c = LearningContent.objects.create(title="公告", is_announcement=True, is_pinned=True, pin_order=1, is_active=True)
+        self.client.post(
+            f"/api/admin/learning/contents/{c.id}/status",
+            {"is_active": False},
+            content_type="application/json",
+            **self.headers,
+        )
+        c.refresh_from_db()
+        self.assertFalse(c.is_pinned)
+        self.assertIsNone(c.pin_order)
 
 
 class PinnedAnnouncementsTests(TestCase):
