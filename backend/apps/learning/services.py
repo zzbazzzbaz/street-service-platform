@@ -51,6 +51,12 @@ def record_data(record: LearningRecord) -> dict:
     }
 
 
+def pinned_announcements():
+    return LearningContent.objects.filter(
+        is_active=True, is_announcement=True, is_pinned=True
+    ).order_by("pin_order")
+
+
 @transaction.atomic
 def complete_learning(member: Member, content: LearningContent, *, learned_seconds: int) -> LearningRecord:
     if not content.is_active:

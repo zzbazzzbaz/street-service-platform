@@ -8,6 +8,30 @@ from apps.learning.services import content_data
 from tests.helpers import auth_header, create_member
 
 
+class PinnedAnnouncementsTests(TestCase):
+    def test_pinned_announcements_public_and_ordered(self):
+        LearningContent.objects.create(title="p1", is_announcement=True, is_pinned=True, pin_order=1)
+        LearningContent.objects.create(title="p2", is_announcement=True, is_pinned=True, pin_order=2)
+        # 非公告置顶项不应出现
+        LearningContent.objects.create(title="普通", is_pinned=True, pin_order=3)
+        r = self.client.get("/api/learning/announcements/pinned")
+        body = r.json()
+        self.assertEqual(body["code"], 0)
+        self.assertEqual([i["title"] for i in body["data"]], ["p1", "p2"])
+        self.assertEqual([i["pin_order"] for i in body["data"]], [1, 2])
+
+    def test_pinned_announcements_empty(self):
+        r = self.client.get("/api/learning/announcements/pinned")
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.json()["data"], [])
+
+    def test_pinned_announcements_max_three(self):
+        for i in range(1, 5):
+            LearningContent.objects.create(title=f"p{i}", is_announcement=True, is_pinned=True, pin_order=i)
+        r = self.client.get("/api/learning/announcements/pinned")
+        self.assertEqual(len(r.json()["data"]), 3)
+
+
 class LearningContentsFilterTests(TestCase):
     def setUp(self):
         self.headers = auth_header("member", create_member().openid)

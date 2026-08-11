@@ -3,7 +3,7 @@ from ninja import Router
 
 from apps.learning.models import LearningContent, LearningRecord
 from apps.learning.schemas import CompleteLearningIn, LearningContentOut, LearningContentsData, LearningRecordOut, LearningRecordsData
-from apps.learning.services import complete_learning, content_data, record_data
+from apps.learning.services import complete_learning, content_data, pinned_announcements, record_data
 from shared.api import ErrorResponse, SuccessResponse, error_response, success_response
 from shared.auth import TokenError
 from shared.exceptions import BusinessError
@@ -35,6 +35,12 @@ def learning_contents(request, page: int = 1, page_size: int = 20, is_announceme
     for item in items:
         item._member_record = records.get(item.id)
     return success_response({"items": [content_data(item, request=request, member=member) for item in items], **page_data})
+
+
+@router.get("/announcements/pinned", response={200: SuccessResponse[list[LearningContentOut]]})
+def learning_announcements_pinned(request):
+    items = pinned_announcements()[:3]
+    return success_response([content_data(item, request=request) for item in items])
 
 
 @router.get("/contents/{content_id}", response={200: SuccessResponse[LearningContentOut], 401: ErrorResponse, 403: ErrorResponse, 404: ErrorResponse})
