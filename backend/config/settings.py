@@ -49,6 +49,7 @@ INSTALLED_APPS = [
     "apps.points",
     "apps.merchants",
     "apps.service_records",
+    "apps.service_locations",
 ]
 
 MIDDLEWARE = [
