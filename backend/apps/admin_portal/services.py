@@ -32,6 +32,8 @@ from apps.problem_feedbacks.models import ProblemFeedback
 from apps.problem_feedbacks.services import problem_feedback_data, reply_problem_feedback
 from apps.reports.models import Report
 from apps.reports.services import report_data, review_report
+from apps.service_locations.models import ServiceLocation
+from apps.service_locations.services import service_location_data
 from shared.auth import issue_admin_token
 from shared.exceptions import BusinessError
 from shared.media import media_url
@@ -1106,3 +1108,56 @@ def delete_point_code(code_id: int) -> dict:
     point_code = get_or_404(MerchantPointCode, code_id)
     point_code.delete()
     return {"deleted": True}
+
+
+# ---------------------------------------------------------------------------
+# Service location management
+# ---------------------------------------------------------------------------
+
+
+def validate_service_location_payload(payload) -> None:
+    if not payload.name.strip():
+        raise BusinessError("名称不能为空")
+    if not payload.address.strip():
+        raise BusinessError("地址不能为空")
+    if len(payload.business_hours) > 100:
+        raise BusinessError("开放时间超出长度限制")
+    if len(payload.service_content) > 500:
+        raise BusinessError("服务事项超出长度限制")
+    validate_coordinates(payload.latitude, payload.longitude)
+
+
+def service_locations_data(*, keyword: str = "", is_active: str = "", page: int = 1, page_size: int = 20) -> dict:
+    queryset = ServiceLocation.objects.all()
+    if keyword:
+        queryset = queryset.filter(Q(name__icontains=keyword) | Q(address__icontains=keyword) | Q(service_content__icontains=keyword))
+    if is_active in {"true", "false"}:
+        queryset = queryset.filter(is_active=is_active == "true")
+    return paginated_data(queryset, service_location_data, page=page, page_size=page_size)
+
+
+def create_service_location(payload) -> ServiceLocation:
+    validate_service_location_payload(payload)
+    return ServiceLocation.objects.create(
+        name=payload.name.strip(),
+        address=payload.address.strip(),
+        business_hours=payload.business_hours.strip(),
+        service_content=payload.service_content.strip(),
+        latitude=payload.latitude,
+        longitude=payload.longitude,
+        is_active=payload.is_active,
+    )
+
+
+def update_service_location(location_id: int, payload) -> ServiceLocation:
+    location = get_or_404(ServiceLocation, location_id)
+    for field in ["name", "address", "business_hours", "service_content", "is_active"]:
+        value = getattr(payload, field)
+        if value is not None:
+            setattr(location, field, value.strip() if isinstance(value, str) else value)
+    if payload.latitude is not None or payload.longitude is not None:
+        location.latitude = payload.latitude
+        location.longitude = payload.longitude
+    validate_service_location_payload(location)
+    location.save()
+    return location

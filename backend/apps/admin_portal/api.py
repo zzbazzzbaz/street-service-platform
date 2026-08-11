@@ -30,6 +30,9 @@ from apps.admin_portal.schemas import (
     LearningContentUpdateIn,
     PinnedItemIn,
     PinnedItemsIn,
+    ServiceLocationIn,
+    ServiceLocationStatusIn,
+    ServiceLocationUpdateIn,
     ManualAdjustmentCreateIn,
     MemberAuditIn,
     MemberUpdateIn,
@@ -56,6 +59,8 @@ from apps.civic_feedbacks.models import CivicFeedback
 from apps.elder_services.models import ElderCareRelation, ElderServiceFeedback, ElderServiceTask
 from apps.learning.models import LearningContent, LearningRecord
 from apps.learning.services import set_pinned_items
+from apps.service_locations.models import ServiceLocation
+from apps.service_locations.services import service_location_data
 from apps.members.models import Member
 from apps.members.services import member_data
 from apps.merchants.models import Merchant, MerchantPointCode, MerchantSettlement
@@ -345,6 +350,57 @@ def admin_learning_pinned_save(request, payload: PinnedItemsIn):
         _admin_or_error(request)
         pins = set_pinned_items([{"content_id": it.content_id, "pin_order": it.pin_order} for it in payload.items])
         return success_response([svc.learning_content_admin_data(c, request=request) for c in pins])
+    except BusinessError as exc:
+        return _business_error(exc)
+
+
+# Service locations
+
+
+@router.get("/service-locations", response={200: SuccessResponse[dict], 401: ErrorResponse, 403: ErrorResponse})
+def admin_service_locations(request, keyword: str = "", is_active: str = "", page: int = 1, page_size: int = 20):
+    try:
+        _admin_or_error(request)
+        return success_response(svc.service_locations_data(keyword=keyword, is_active=is_active, page=page, page_size=page_size))
+    except BusinessError as exc:
+        return _business_error(exc)
+
+
+@router.post("/service-locations", response={200: SuccessResponse[dict], 400: ErrorResponse, 401: ErrorResponse, 403: ErrorResponse})
+def admin_service_location_create(request, payload: ServiceLocationIn):
+    try:
+        _admin_or_error(request)
+        return success_response(service_location_data(svc.create_service_location(payload)))
+    except BusinessError as exc:
+        return _business_error(exc)
+
+
+@router.get("/service-locations/{location_id}", response={200: SuccessResponse[dict], 401: ErrorResponse, 403: ErrorResponse, 404: ErrorResponse})
+def admin_service_location_detail(request, location_id: int):
+    try:
+        _admin_or_error(request)
+        return success_response(service_location_data(svc.get_or_404(ServiceLocation, location_id)))
+    except BusinessError as exc:
+        return _business_error(exc)
+
+
+@router.patch("/service-locations/{location_id}", response={200: SuccessResponse[dict], 400: ErrorResponse, 401: ErrorResponse, 403: ErrorResponse, 404: ErrorResponse})
+def admin_service_location_update(request, location_id: int, payload: ServiceLocationUpdateIn):
+    try:
+        _admin_or_error(request)
+        return success_response(service_location_data(svc.update_service_location(location_id, payload)))
+    except BusinessError as exc:
+        return _business_error(exc)
+
+
+@router.post("/service-locations/{location_id}/status", response={200: SuccessResponse[dict], 400: ErrorResponse, 401: ErrorResponse, 403: ErrorResponse, 404: ErrorResponse})
+def admin_service_location_status(request, location_id: int, payload: ServiceLocationStatusIn):
+    try:
+        _admin_or_error(request)
+        location = svc.get_or_404(ServiceLocation, location_id)
+        location.is_active = payload.is_active
+        location.save(update_fields=["is_active"])
+        return success_response(service_location_data(location))
     except BusinessError as exc:
         return _business_error(exc)
 
