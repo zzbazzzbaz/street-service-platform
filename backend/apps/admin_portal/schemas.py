@@ -132,6 +132,30 @@ class LearningContentStatusIn(Schema):
     is_active: bool
 
 
+class ServiceLocationIn(Schema):
+    name: str
+    address: str
+    business_hours: str
+    service_content: str
+    latitude: float | None = None
+    longitude: float | None = None
+    is_active: bool = True
+
+
+class ServiceLocationUpdateIn(Schema):
+    name: str | None = None
+    address: str | None = None
+    business_hours: str | None = None
+    service_content: str | None = None
+    latitude: float | None = None
+    longitude: float | None = None
+    is_active: bool | None = None
+
+
+class ServiceLocationStatusIn(Schema):
+    is_active: bool
+
+
 class PinnedItemIn(Schema):
     content_id: int
     pin_order: int
