@@ -31,6 +31,10 @@ def content_data(content: LearningContent, request=None, member: Member | None =
         "points": content.points,
         "required_seconds": content.required_seconds,
         "is_active": content.is_active,
+        "is_announcement": content.is_announcement,
+        "is_pinned": content.is_pinned,
+        "pin_order": content.pin_order,
+        "created_at": content.created_at,
         "is_completed": record.is_completed if record is not None else False,
         "completed_at": record.completed_at if record is not None and record.is_completed else None,
     }
@@ -45,6 +49,45 @@ def record_data(record: LearningRecord) -> dict:
         "completed_at": record.completed_at,
         "point_record_id": record.point_record_id,
     }
+
+
+def pinned_announcements():
+    return LearningContent.objects.filter(
+        is_active=True, is_announcement=True, is_pinned=True
+    ).order_by("pin_order")
+
+
+def set_pinned_items(items):
+    items = list(items)
+    if len(items) > 3:
+        raise BusinessError("最多置顶 3 条公告")
+    ids = [it["content_id"] for it in items]
+    orders = [it["pin_order"] for it in items]
+    if len(set(ids)) != len(ids):
+        raise BusinessError("置顶公告不能重复")
+    if len(set(orders)) != len(orders):
+        raise BusinessError("置顶顺序不能重复")
+    if orders and sorted(orders) != list(range(1, len(orders) + 1)):
+        raise BusinessError("置顶顺序必须从 1 开始连续")
+    with transaction.atomic():
+        contents = {c.id: c for c in LearningContent.objects.filter(id__in=ids)}
+        for it in items:
+            c = contents.get(it["content_id"])
+            if c is None:
+                raise BusinessError("内容不存在")
+            if not c.is_active:
+                raise BusinessError("内容未上架")
+            if not c.is_announcement:
+                raise BusinessError("仅公告类型内容可置顶")
+            if not c.cover:
+                raise BusinessError("公告未配置封面")
+        LearningContent.objects.filter(is_pinned=True).update(is_pinned=False, pin_order=None)
+        for it in items:
+            c = contents[it["content_id"]]
+            c.is_pinned = True
+            c.pin_order = it["pin_order"]
+            c.save(update_fields=["is_pinned", "pin_order"])
+    return list(pinned_announcements())
 
 
 @transaction.atomic

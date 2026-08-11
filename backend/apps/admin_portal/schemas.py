@@ -112,6 +112,7 @@ class LearningContentIn(Schema):
     points: int = 0
     required_seconds: int = 60
     is_active: bool = True
+    is_announcement: bool = False
 
 
 class LearningContentUpdateIn(Schema):
@@ -124,10 +125,20 @@ class LearningContentUpdateIn(Schema):
     points: int | None = None
     required_seconds: int | None = None
     is_active: bool | None = None
+    is_announcement: bool | None = None
 
 
 class LearningContentStatusIn(Schema):
     is_active: bool
+
+
+class PinnedItemIn(Schema):
+    content_id: int
+    pin_order: int
+
+
+class PinnedItemsIn(Schema):
+    items: list[PinnedItemIn]
 
 
 class ReportUpdateIn(Schema):

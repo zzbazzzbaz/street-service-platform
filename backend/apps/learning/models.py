@@ -16,6 +16,9 @@ class LearningContent(models.Model):
     points = models.PositiveIntegerField("积分值", default=0)
     required_seconds = models.PositiveIntegerField("要求学习秒数", default=60)
     is_active = models.BooleanField("是否上架", default=True)
+    is_announcement = models.BooleanField("是否公告类型", default=False)
+    is_pinned = models.BooleanField("是否置顶公告", default=False)
+    pin_order = models.PositiveIntegerField("置顶顺序", null=True, blank=True, default=None)
     created_at = models.DateTimeField("创建时间", auto_now_add=True)
 
     class Meta:
@@ -23,6 +26,13 @@ class LearningContent(models.Model):
         verbose_name = "学习内容"
         verbose_name_plural = "学习内容"
         ordering = ("-created_at", "-id")
+        constraints = [
+            models.UniqueConstraint(
+                fields=["pin_order"],
+                condition=models.Q(is_pinned=True),
+                name="uniq_pin_order_when_pinned",
+            ),
+        ]
 
     def __str__(self) -> str:
         return self.title

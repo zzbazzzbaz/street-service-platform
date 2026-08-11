@@ -15,6 +15,10 @@ class LearningContentOut(Schema):
     points: int
     required_seconds: int
     is_active: bool
+    is_announcement: bool
+    is_pinned: bool
+    pin_order: int | None = None
+    created_at: datetime
     is_completed: bool = False
     completed_at: datetime | None = None
 
