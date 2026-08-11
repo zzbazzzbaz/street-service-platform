@@ -15,14 +15,19 @@ router = Router(tags=["学习"])
 
 
 @router.get("/contents", response={200: SuccessResponse[LearningContentsData], 401: ErrorResponse, 403: ErrorResponse})
-def learning_contents(request, page: int = 1, page_size: int = 20):
+def learning_contents(request, page: int = 1, page_size: int = 20, is_announcement: bool | None = None, is_pinned: bool | None = None):
     try:
         member = authenticate_member(request)
     except TokenError as exc:
         return error_response(40001, str(exc), status=401)
     except BusinessError as exc:
         return error_response(exc.code, exc.message, status=exc.status, errors=exc.errors)
-    items, page_data = paginate_queryset(LearningContent.objects.filter(is_active=True), page=page, page_size=page_size)
+    queryset = LearningContent.objects.filter(is_active=True)
+    if is_announcement is not None:
+        queryset = queryset.filter(is_announcement=is_announcement)
+    if is_pinned is not None:
+        queryset = queryset.filter(is_pinned=is_pinned)
+    items, page_data = paginate_queryset(queryset, page=page, page_size=page_size)
     records = {
         record.content_id: record
         for record in LearningRecord.objects.filter(member=member, content_id__in=[item.id for item in items])
