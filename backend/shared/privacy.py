@@ -27,3 +27,13 @@ def member_brief(member: Member | None) -> dict:
         "member_name": member.real_name or member.nickname,
         "member_phone": mask_phone(member.phone),
     }
+
+
+def admin_member_brief(member: Member | None) -> dict:
+    if member is None:
+        return {"member_id": None, "member_name": "", "member_phone": ""}
+    return {
+        "member_id": member.id,
+        "member_name": member.real_name or member.nickname,
+        "member_phone": member.phone or "",
+    }

@@ -1,9 +1,10 @@
 from ninja import Router
 from django_ratelimit.decorators import ratelimit
 
-from apps.members.schemas import AuditProfileIn, LoginOut, MemberOut, ProfileIn, WechatLoginIn, WechatPhoneLoginIn
+from apps.members.schemas import AuditProfileIn, LoginOut, MemberOut, PasswordLoginIn, ProfileIn, WechatLoginIn, WechatPhoneLoginIn
 from apps.members.services import (
     member_data,
+    password_login,
     submit_audit_profile,
     test_login,
     update_profile,
@@ -36,6 +37,15 @@ def wechat_login(request, payload: WechatLoginIn):
 def wechat_phone_login(request, payload: WechatPhoneLoginIn):
     try:
         return success_response(member_wechat_phone_login(payload.login_code, payload.phone_code))
+    except BusinessError as exc:
+        return error_response(exc.code, exc.message, status=exc.status, errors=exc.errors)
+
+
+@auth_router.post("/login", response={200: SuccessResponse[LoginOut], 400: ErrorResponse, 403: ErrorResponse})
+@ratelimit(key="ip", rate="5/m", block=True)
+def password_login_view(request, payload: PasswordLoginIn):
+    try:
+        return success_response(password_login(payload.username, payload.password))
     except BusinessError as exc:
         return error_response(exc.code, exc.message, status=exc.status, errors=exc.errors)
 

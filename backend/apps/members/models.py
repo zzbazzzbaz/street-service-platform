@@ -13,6 +13,8 @@ class Member(models.Model):
         REJECTED = "rejected", "已驳回"
 
     openid = models.CharField("OpenID", max_length=128, unique=True)
+    username = models.CharField("用户名", max_length=64, unique=True, null=True, blank=True)
+    password = models.CharField("密码", max_length=128, blank=True)
     nickname = models.CharField("昵称", max_length=64, blank=True)
     phone = models.CharField("手机号", max_length=20, blank=True)
     real_name = models.CharField("真实姓名", max_length=50, blank=True)

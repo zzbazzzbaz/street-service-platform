@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from django.conf import settings
+from django.contrib.auth.hashers import check_password
 from django.utils import timezone
 
 from apps.members.models import Member
@@ -14,6 +15,7 @@ def member_data(member: Member) -> dict:
     return {
         "id": member.id,
         "openid": member.openid,
+        "username": member.username or "",
         "nickname": member.nickname,
         "phone": member.phone,
         "real_name": member.real_name,
@@ -46,6 +48,26 @@ def wechat_login_placeholder(code: str) -> dict:
     if not settings.WECHAT_MINIAPP_APPID or not settings.WECHAT_MINIAPP_SECRET:
         raise BusinessError("微信登录未配置，开发期请使用测试登录", code=40000)
     raise BusinessError("正式微信登录暂未接入", code=40000)
+
+
+def password_login(username: str, password: str) -> dict:
+    username = username.strip()
+    if not username or not password:
+        raise BusinessError("用户名或密码错误", code=40000, status=400)
+    member = Member.objects.filter(username=username).first()
+    if member is None or not member.password:
+        raise BusinessError("用户名或密码错误", code=40000, status=400)
+    if not check_password(password, member.password):
+        raise BusinessError("用户名或密码错误", code=40000, status=400)
+    if not member.is_active:
+        raise BusinessError("当前账号已停用", code=40301, status=403)
+    token, expires_in = issue_token(subject_type="member", openid=member.openid)
+    return {
+        "access_token": token,
+        "token_type": "Bearer",
+        "expires_in": expires_in,
+        "member": member_data(member),
+    }
 
 
 def wechat_phone_login(login_code: str, phone_code: str) -> dict:

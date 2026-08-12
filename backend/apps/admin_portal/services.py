@@ -25,7 +25,7 @@ from apps.learning.services import content_data, record_data
 from apps.members.models import Member
 from apps.members.services import member_data
 from apps.merchants.models import Merchant, MerchantPointCode, MerchantSettlement
-from apps.merchants.services import fixed_code_data, generate_point_code_token, merchant_data, merchant_point_record_data, merchant_point_records_summary, point_code_data, settlement_data
+from apps.merchants.services import fixed_code_data, generate_point_code_token, merchant_data, merchant_point_records_summary, payment_record_data, point_code_data, settlement_data
 from apps.points.models import ManualPointAdjustment, PointAccount, PointExchangeRule, PointRecord
 from apps.points.services import get_or_create_account, manual_add_points, point_record_data
 from apps.problem_feedbacks.models import ProblemFeedback
@@ -38,7 +38,7 @@ from shared.auth import issue_admin_token
 from shared.exceptions import BusinessError
 from shared.media import media_url
 from shared.pagination import paginate_queryset
-from shared.privacy import mask_phone, member_brief
+from shared.privacy import admin_member_brief
 
 logger = logging.getLogger("street.admin")
 
@@ -209,7 +209,7 @@ def members_data(*, keyword: str = "", identity_type: str = "", audit_status: st
     queryset = Member.objects.all()
     keyword = keyword.strip()
     if keyword:
-        queryset = queryset.filter(Q(openid__icontains=keyword) | Q(nickname__icontains=keyword) | Q(phone__icontains=keyword) | Q(real_name__icontains=keyword))
+        queryset = queryset.filter(Q(openid__icontains=keyword) | Q(username__icontains=keyword) | Q(nickname__icontains=keyword) | Q(phone__icontains=keyword) | Q(real_name__icontains=keyword))
     if identity_type:
         queryset = queryset.filter(identity_type=identity_type)
     if audit_status:
@@ -376,7 +376,7 @@ def delete_learning_content(content_id: int) -> dict:
 
 def admin_record_data(record: LearningRecord) -> dict:
     data = record_data(record)
-    data.update(member_brief(record.member))
+    data.update(admin_member_brief(record.member))
     data["content_title"] = record.content.title
     return data
 
@@ -388,34 +388,34 @@ def admin_record_data(record: LearningRecord) -> dict:
 
 def report_admin_data(report: Report, request=None) -> dict:
     data = report_data(report, request=request)
-    data.update(member_brief(report.member))
+    data.update(admin_member_brief(report.member))
     data["source_type"] = "report"
     return data
 
 
 def civic_feedback_admin_data(feedback: CivicFeedback) -> dict:
     data = civic_feedback_data(feedback)
-    data.update(member_brief(feedback.member))
+    data.update(admin_member_brief(feedback.member))
     data["source_type"] = "civic_feedback"
     return data
 
 
 def problem_feedback_admin_data(feedback: ProblemFeedback) -> dict:
     data = problem_feedback_data(feedback)
-    data.update(member_brief(feedback.member))
+    data.update(admin_member_brief(feedback.member))
     data["source_type"] = "problem_feedback"
     return data
 
 
 def point_record_admin_data(record: PointRecord) -> dict:
     data = point_record_data(record)
-    data.update(member_brief(record.member))
+    data.update(admin_member_brief(record.member))
     return data
 
 
 def elder_feedback_admin_data(feedback: ElderServiceFeedback, request=None) -> dict:
     data = elder_feedback_data(feedback, request=request)
-    data.update(member_brief(feedback.member))
+    data.update(admin_member_brief(feedback.member))
     data["source_type"] = "elder_service"
     return data
 
@@ -635,13 +635,13 @@ def delete_activity(activity_id: int) -> dict:
 
 def signup_admin_data(signup: ActivitySignup) -> dict:
     data = signup_data(signup)
-    data.update(member_brief(signup.member))
+    data.update(admin_member_brief(signup.member))
     return data
 
 
 def checkin_admin_data(checkin: ActivityCheckin) -> dict:
     data = checkin_data(checkin)
-    data.update(member_brief(checkin.member))
+    data.update(admin_member_brief(checkin.member))
     data["activity_title"] = checkin.activity.title
     data["source_type"] = "activity"
     return data
@@ -663,7 +663,7 @@ def checkin_code_data(activity: Activity, request=None) -> dict:
 def relation_data(relation: ElderCareRelation) -> dict:
     return {
         "id": relation.id,
-        **member_brief(relation.member),
+        **admin_member_brief(relation.member),
         "elder_name": relation.elder_name,
         "elder_address": relation.elder_address,
         "is_active": relation.is_active,
@@ -719,7 +719,7 @@ def elder_task_admin_data(task: ElderServiceTask) -> dict:
         "id": task.id,
         "title": task.title,
         "relation_id": task.relation_id,
-        **member_brief(member),
+        **admin_member_brief(member),
         "elder_name": relation.elder_name if relation else "",
         "description": task.description,
         "location": task.location,
@@ -792,7 +792,7 @@ def update_elder_feedback(feedback_id: int, payload) -> dict:
 def point_account_data(account: PointAccount) -> dict:
     return {
         "id": account.id,
-        **member_brief(account.member),
+        **admin_member_brief(account.member),
         "balance": account.balance,
     }
 
@@ -800,7 +800,7 @@ def point_account_data(account: PointAccount) -> dict:
 def manual_adjustment_data(adjustment: ManualPointAdjustment) -> dict:
     return {
         "id": adjustment.id,
-        **member_brief(adjustment.member),
+        **admin_member_brief(adjustment.member),
         "amount": adjustment.amount,
         "reason": adjustment.reason,
         "operator_id": adjustment.operator_id,
@@ -966,9 +966,15 @@ def merchant_payment_records_queryset(*, merchant_id: int | None = None, keyword
     return queryset
 
 
+def admin_merchant_point_record_data(record: PointRecord) -> dict:
+    data = payment_record_data(record)
+    data.update(admin_member_brief(record.member))
+    return data
+
+
 def merchant_payment_records_data(queryset, *, page: int = 1, page_size: int = 20) -> dict:
     items, page_data = paginate_queryset(queryset, page=page, page_size=page_size)
-    return {"items": [merchant_point_record_data(item) for item in items], "summary": merchant_point_records_summary(queryset), **page_data}
+    return {"items": [admin_merchant_point_record_data(item) for item in items], "summary": merchant_point_records_summary(queryset), **page_data}
 
 
 def settlements_data(*, merchant_id: int | None = None, status: str = "", page: int = 1, page_size: int = 20) -> dict:

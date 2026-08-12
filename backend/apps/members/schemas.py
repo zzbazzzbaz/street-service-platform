@@ -16,9 +16,15 @@ class WechatPhoneLoginIn(Schema):
     platform: str = "user_mp"
 
 
+class PasswordLoginIn(Schema):
+    username: str
+    password: str
+
+
 class MemberOut(Schema):
     id: int
     openid: str
+    username: str | None = None
     nickname: str
     phone: str
     real_name: str
