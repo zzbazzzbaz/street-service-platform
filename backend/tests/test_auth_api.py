@@ -1,5 +1,6 @@
 from unittest.mock import patch
 
+from django.contrib.auth.hashers import make_password
 from django.test import TestCase, override_settings
 
 from apps.members.models import Member
@@ -274,3 +275,95 @@ class AuthApiTests(TestCase):
         response = self.client.post("/api/auth/test-login", {"openid": "member-openid"}, content_type="application/json")
 
         self.assertEqual(response.status_code, 404)
+
+
+class MerchantPasswordLoginTests(TestCase):
+    def make_merchant(self, **kwargs):
+        defaults = {
+            "openid": "account:merchant-a",
+            "username": "merchant_a",
+            "password": make_password("merchant123456"),
+            "name": "账号登录商户",
+            "is_active": True,
+        }
+        defaults.update(kwargs)
+        return Merchant.objects.create(**defaults)
+
+    def test_merchant_password_login_success(self):
+        self.make_merchant()
+        response = self.client.post(
+            "/api/merchant/auth/login",
+            {"username": "merchant_a", "password": "merchant123456"},
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["code"], 0)
+        data = payload["data"]
+        self.assertEqual(data["token_type"], "Bearer")
+        self.assertTrue(data["access_token"])
+        self.assertEqual(data["merchant"]["username"], "merchant_a")
+        self.assertEqual(data["merchant"]["name"], "账号登录商户")
+        # token 可访问商户端业务接口
+        me = self.client.get("/api/merchant/me", HTTP_AUTHORIZATION=f"Bearer {data['access_token']}")
+        self.assertEqual(me.status_code, 200)
+        self.assertEqual(me.json()["data"]["username"], "merchant_a")
+
+    def test_merchant_password_login_wrong_password(self):
+        self.make_merchant()
+        response = self.client.post(
+            "/api/merchant/auth/login",
+            {"username": "merchant_a", "password": "wrong-password"},
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        payload = response.json()
+        self.assertEqual(payload["code"], 40000)
+        self.assertEqual(payload["message"], "用户名或密码错误")
+
+    def test_merchant_password_login_unknown_user(self):
+        response = self.client.post(
+            "/api/merchant/auth/login",
+            {"username": "no-such-merchant", "password": "merchant123456"},
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json()["code"], 40000)
+
+    def test_merchant_password_login_empty_fields(self):
+        self.make_merchant()
+        response = self.client.post(
+            "/api/merchant/auth/login",
+            {"username": "", "password": ""},
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json()["code"], 40000)
+
+    def test_merchant_password_login_disabled_account(self):
+        self.make_merchant(is_active=False)
+        response = self.client.post(
+            "/api/merchant/auth/login",
+            {"username": "merchant_a", "password": "merchant123456"},
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 403)
+        payload = response.json()
+        self.assertEqual(payload["code"], 40301)
+        self.assertEqual(payload["message"], "当前账号已停用")
+
+    def test_merchant_password_login_missing_password_hash(self):
+        Merchant.objects.create(openid="account:merchant-b", username="merchant_b", name="无密码商户")
+        response = self.client.post(
+            "/api/merchant/auth/login",
+            {"username": "merchant_b", "password": "whatever123"},
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json()["code"], 40000)

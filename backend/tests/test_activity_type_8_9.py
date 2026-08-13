@@ -87,7 +87,8 @@ class AdminSignupsAndCheckinsFilterTests(TestCase):
         self.assertEqual(item["activity_type"], "offline")
         self.assertEqual(item["member_id"], self.member.id)
         self.assertEqual(item["member_name"], "张三")
-        self.assertEqual(item["member_phone"], "138****1234")
+        # 后台接口按 8.12 调整返回完整手机号
+        self.assertEqual(item["member_phone"], "13800001234")
 
     def test_admin_checkins_filters_and_returns_type_and_member(self):
         ActivityCheckin.objects.create(member=self.member, activity=self.off)

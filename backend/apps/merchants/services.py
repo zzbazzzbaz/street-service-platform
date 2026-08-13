@@ -3,6 +3,7 @@ from __future__ import annotations
 from decimal import Decimal, ROUND_HALF_UP
 
 from django.conf import settings
+from django.contrib.auth.hashers import check_password
 from django.db.models import Sum
 from django.db import transaction
 from django.utils import timezone
@@ -26,6 +27,7 @@ def merchant_data(merchant: Merchant) -> dict:
     return {
         "id": merchant.id,
         "openid": merchant.openid,
+        "username": merchant.username or "",
         "name": merchant.name,
         "contact_name": merchant.contact_name,
         "phone": merchant.phone,
@@ -61,6 +63,26 @@ def test_login(openid: str) -> dict:
         raise BusinessError("openid 不能为空")
     merchant, _ = Merchant.objects.get_or_create(openid=openid, defaults={"name": f"测试商户-{openid}"})
     token, expires_in = issue_token(subject_type="merchant", openid=openid)
+    return {
+        "access_token": token,
+        "token_type": "Bearer",
+        "expires_in": expires_in,
+        "merchant": merchant_data(merchant),
+    }
+
+
+def password_login(username: str, password: str) -> dict:
+    username = (username or "").strip()
+    if not username or not password:
+        raise BusinessError("用户名或密码错误", code=40000, status=400)
+    merchant = Merchant.objects.filter(username=username).first()
+    if merchant is None or not merchant.password:
+        raise BusinessError("用户名或密码错误", code=40000, status=400)
+    if not check_password(password, merchant.password):
+        raise BusinessError("用户名或密码错误", code=40000, status=400)
+    if not merchant.is_active:
+        raise BusinessError("当前账号已停用", code=40301, status=403)
+    token, expires_in = issue_token(subject_type="merchant", openid=merchant.openid)
     return {
         "access_token": token,
         "token_type": "Bearer",

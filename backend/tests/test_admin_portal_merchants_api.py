@@ -1,5 +1,6 @@
 from decimal import Decimal
 
+from django.contrib.auth.hashers import make_password
 from django.test import TestCase
 from django.utils import timezone
 
@@ -103,3 +104,116 @@ class AdminPortalMerchantsApiTests(TestCase):
             **self.headers,
         )
         self.assertEqual(response.status_code, 400)
+
+
+class AdminPortalMerchantAccountTests(TestCase):
+    def setUp(self):
+        self.admin = create_admin_user()
+        self.headers = admin_auth_header(self.admin)
+
+    def test_merchant_create_with_username_password_then_password_login(self):
+        create_response = self.client.post(
+            "/api/admin/merchants",
+            {
+                "openid": "merchant-openid",
+                "username": "merchant_a",
+                "password": "merchant123456",
+                "name": "便民超市",
+                "contact_name": "王店长",
+                "phone": "13900000000",
+                "is_active": True,
+            },
+            content_type="application/json",
+            **self.headers,
+        )
+        self.assertEqual(create_response.status_code, 200)
+        data = create_response.json()["data"]
+        self.assertEqual(data["username"], "merchant_a")
+
+        login_response = self.client.post(
+            "/api/merchant/auth/login",
+            {"username": "merchant_a", "password": "merchant123456"},
+            content_type="application/json",
+        )
+        self.assertEqual(login_response.status_code, 200)
+        self.assertEqual(login_response.json()["data"]["merchant"]["username"], "merchant_a")
+
+    def test_merchant_create_username_without_password_rejected(self):
+        response = self.client.post(
+            "/api/admin/merchants",
+            {"openid": "merchant-openid", "username": "merchant_a", "name": "便民超市"},
+            content_type="application/json",
+            **self.headers,
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("密码", response.json()["message"])
+
+    def test_merchant_create_username_must_be_unique(self):
+        Merchant.objects.create(openid="dup-openid", username="merchant_a", name="已有商户")
+        response = self.client.post(
+            "/api/admin/merchants",
+            {"openid": "merchant-openid", "username": "merchant_a", "password": "merchant123456", "name": "重复商户"},
+            content_type="application/json",
+            **self.headers,
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("用户名", response.json()["message"])
+
+    def test_merchant_password_reset_endpoint(self):
+        Merchant.objects.create(
+            openid="merchant-openid",
+            username="merchant_a",
+            password=make_password("merchant123456"),
+            name="便民超市",
+        )
+        merchant = Merchant.objects.get(username="merchant_a")
+
+        reset_response = self.client.post(
+            f"/api/admin/merchants/{merchant.id}/password",
+            {"password": "newpass123456"},
+            content_type="application/json",
+            **self.headers,
+        )
+        self.assertEqual(reset_response.status_code, 200)
+        self.assertTrue(reset_response.json()["data"]["password_reset"])
+
+        old_login = self.client.post(
+            "/api/merchant/auth/login",
+            {"username": "merchant_a", "password": "merchant123456"},
+            content_type="application/json",
+        )
+        self.assertEqual(old_login.status_code, 400)
+
+        new_login = self.client.post(
+            "/api/merchant/auth/login",
+            {"username": "merchant_a", "password": "newpass123456"},
+            content_type="application/json",
+        )
+        self.assertEqual(new_login.status_code, 200)
+
+    def test_merchant_password_reset_requires_username(self):
+        merchant = Merchant.objects.create(openid="merchant-openid", name="无用户名商户")
+        response = self.client.post(
+            f"/api/admin/merchants/{merchant.id}/password",
+            {"password": "newpass123456"},
+            content_type="application/json",
+            **self.headers,
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("用户名", response.json()["message"])
+
+    def test_merchant_password_reset_too_short(self):
+        merchant = Merchant.objects.create(
+            openid="merchant-openid",
+            username="merchant_a",
+            password=make_password("merchant123456"),
+            name="便民超市",
+        )
+        response = self.client.post(
+            f"/api/admin/merchants/{merchant.id}/password",
+            {"password": "short"},
+            content_type="application/json",
+            **self.headers,
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("至少 8 位", response.json()["message"])

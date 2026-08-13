@@ -296,6 +296,8 @@ class ExchangeRuleStatusIn(Schema):
 
 class MerchantIn(Schema):
     openid: str = ""
+    username: str = ""
+    password: str = ""
     name: str
     contact_name: str = ""
     phone: str = ""
@@ -310,6 +312,7 @@ class MerchantIn(Schema):
 
 class MerchantUpdateIn(Schema):
     openid: str | None = None
+    username: str | None = None
     name: str | None = None
     contact_name: str | None = None
     phone: str | None = None

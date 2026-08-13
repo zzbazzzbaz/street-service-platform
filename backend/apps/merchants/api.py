@@ -11,6 +11,7 @@ from apps.merchants.schemas import (
     MerchantPointCodePreviewOut,
     MerchantPointCodeScanIn,
     MerchantPointCodeScanOut,
+    MerchantPasswordLoginIn,
     MerchantPointCodesData,
     MerchantPointPaymentIn,
     MerchantPointPaymentOut,
@@ -28,6 +29,7 @@ from apps.merchants.services import (
     merchant_point_record_data,
     merchant_point_records_queryset,
     merchant_point_records_summary,
+    password_login,
     payment_record_data,
     pay_merchant_with_points,
     point_code_payment_preview,
@@ -68,6 +70,15 @@ def merchant_wechat_login(request, payload: MerchantWechatLoginIn):
 def merchant_wechat_phone_login(request, payload: MerchantWechatPhoneLoginIn):
     try:
         return success_response(merchant_wechat_phone_login_service(payload.login_code, payload.phone_code))
+    except BusinessError as exc:
+        return error_response(exc.code, exc.message, status=exc.status, errors=exc.errors)
+
+
+@merchant_auth_router.post("/login", response={200: SuccessResponse[MerchantLoginOut], 400: ErrorResponse, 403: ErrorResponse})
+@ratelimit(key="ip", rate="5/m", block=True)
+def merchant_password_login_view(request, payload: MerchantPasswordLoginIn):
+    try:
+        return success_response(password_login(payload.username, payload.password))
     except BusinessError as exc:
         return error_response(exc.code, exc.message, status=exc.status, errors=exc.errors)
 

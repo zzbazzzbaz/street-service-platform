@@ -11,6 +11,8 @@ class Merchant(models.Model):
         OTHER = "other", "其他"
 
     openid = models.CharField("OpenID", max_length=128, unique=True)
+    username = models.CharField("用户名", max_length=64, unique=True, null=True, blank=True)
+    password = models.CharField("密码", max_length=128, blank=True)
     name = models.CharField("商户名称", max_length=100)
     contact_name = models.CharField("联系人", max_length=50, blank=True)
     phone = models.CharField("手机号", max_length=20, blank=True)

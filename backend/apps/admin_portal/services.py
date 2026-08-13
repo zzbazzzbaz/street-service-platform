@@ -7,6 +7,7 @@ import logging
 
 from django.conf import settings
 from django.contrib.auth import authenticate, get_user_model
+from django.contrib.auth.hashers import make_password
 from django.contrib.auth.models import update_last_login
 from django.db import transaction
 from django.db.models import Q, Sum
@@ -848,7 +849,7 @@ def save_exchange_rule(rule: PointExchangeRule, *, points_per_yuan: int | None =
 def merchants_data(*, keyword: str = "", is_active: str = "", page: int = 1, page_size: int = 20) -> dict:
     queryset = Merchant.objects.all()
     if keyword:
-        queryset = queryset.filter(Q(openid__icontains=keyword) | Q(name__icontains=keyword) | Q(contact_name__icontains=keyword) | Q(phone__icontains=keyword))
+        queryset = queryset.filter(Q(openid__icontains=keyword) | Q(username__icontains=keyword) | Q(name__icontains=keyword) | Q(contact_name__icontains=keyword) | Q(phone__icontains=keyword))
     if is_active in {"true", "false"}:
         queryset = queryset.filter(is_active=is_active == "true")
     return paginated_data(queryset, merchant_data, page=page, page_size=page_size)
@@ -862,6 +863,26 @@ def validate_merchant_unique(openid: str, *, exclude_id: int | None = None) -> N
             queryset = queryset.exclude(pk=exclude_id)
         if queryset.exists():
             raise BusinessError("商户 openid 已存在")
+
+
+def validate_merchant_username(username: str, *, exclude_id: int | None = None) -> str:
+    username = (username or "").strip()
+    if not username:
+        return ""
+    if len(username) > 64:
+        raise BusinessError(
+            "用户名长度超出限制",
+            errors={"username": ["用户名最多 64 字符"]},
+        )
+    queryset = Merchant.objects.filter(username=username)
+    if exclude_id is not None:
+        queryset = queryset.exclude(pk=exclude_id)
+    if queryset.exists():
+        raise BusinessError(
+            "商户用户名已存在",
+            errors={"username": ["该用户名已被使用"]},
+        )
+    return username
 
 
 def validate_merchant_category(category_code: str) -> str:
@@ -898,10 +919,18 @@ def create_merchant(payload) -> Merchant:
     if not payload.name.strip():
         raise BusinessError("商户名称不能为空")
     validate_merchant_unique(payload.openid)
+    username = validate_merchant_username(getattr(payload, "username", ""))
+    password = (getattr(payload, "password", "") or "").strip()
+    if username and not password:
+        raise BusinessError("设置用户名时必须同时设置密码")
+    if password and len(password) < 8:
+        raise BusinessError("密码长度至少 8 位")
     validate_coordinates(payload.latitude, payload.longitude)
     category_code = validate_merchant_category(payload.category_code)
     return Merchant.objects.create(
         openid=payload.openid.strip(),
+        username=username or None,
+        password=make_password(password) if username else "",
         name=payload.name.strip(),
         contact_name=payload.contact_name.strip(),
         phone=payload.phone.strip(),
@@ -920,6 +949,9 @@ def update_merchant(merchant_id: int, payload) -> Merchant:
     if payload.openid is not None:
         validate_merchant_unique(payload.openid, exclude_id=merchant.id)
         merchant.openid = payload.openid.strip()
+    if getattr(payload, "username", None) is not None:
+        username = validate_merchant_username(payload.username, exclude_id=merchant.id)
+        merchant.username = username or None
     for field in ["name", "contact_name", "phone", "address", "business_hours", "service_content", "is_active"]:
         value = getattr(payload, field)
         if value is not None:
@@ -934,6 +966,18 @@ def update_merchant(merchant_id: int, payload) -> Merchant:
         raise BusinessError("商户名称不能为空")
     merchant.save()
     return merchant
+
+
+def reset_merchant_password(merchant_id: int, *, password: str) -> dict:
+    merchant = get_or_404(Merchant, merchant_id)
+    password = (password or "").strip()
+    if len(password) < 8:
+        raise BusinessError("密码长度至少 8 位")
+    if not merchant.username:
+        raise BusinessError("该商户未设置用户名，无法重置密码")
+    merchant.password = make_password(password)
+    merchant.save(update_fields=["password"])
+    return {"id": merchant.id, "password_reset": True}
 
 
 def delete_merchant(merchant_id: int) -> dict:

@@ -14,9 +14,15 @@ class MerchantWechatPhoneLoginIn(Schema):
     platform: str = "merchant_mp"
 
 
+class MerchantPasswordLoginIn(Schema):
+    username: str
+    password: str
+
+
 class MerchantOut(Schema):
     id: int
     openid: str
+    username: str | None = None
     name: str
     contact_name: str
     phone: str

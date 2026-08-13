@@ -1,6 +1,7 @@
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
+from django.contrib.auth.hashers import make_password
 from django.core.management.base import BaseCommand
 from django.utils import timezone
 
@@ -112,7 +113,15 @@ class Command(BaseCommand):
 
         merchant, _ = Merchant.objects.update_or_create(
             openid="merchant-openid",
-            defaults={"name": "便民超市", "contact_name": "王店长", "phone": "13900000000", "address": "幸福街道便民服务点", "is_active": True},
+            defaults={
+                "name": "便民超市",
+                "contact_name": "王店长",
+                "phone": "13900000000",
+                "address": "幸福街道便民服务点",
+                "username": "merchant",
+                "password": make_password("merchant123456"),
+                "is_active": True,
+            },
         )
         Merchant.objects.update_or_create(
             openid="test-merchant-openid",

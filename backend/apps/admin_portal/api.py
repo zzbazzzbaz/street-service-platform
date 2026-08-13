@@ -1075,6 +1075,15 @@ def admin_merchant_status(request, merchant_id: int, payload: StatusIn):
         return _business_error(exc)
 
 
+@router.post("/merchants/{merchant_id}/password", response={200: SuccessResponse[dict], 400: ErrorResponse, 401: ErrorResponse, 403: ErrorResponse, 404: ErrorResponse})
+def admin_merchant_password(request, merchant_id: int, payload: PasswordResetIn):
+    try:
+        _admin_or_error(request)
+        return success_response(svc.reset_merchant_password(merchant_id, password=payload.password))
+    except BusinessError as exc:
+        return _business_error(exc)
+
+
 @router.get("/merchants/point-codes", response={200: SuccessResponse[dict], 401: ErrorResponse, 403: ErrorResponse})
 def admin_point_codes(request, merchant_id: int | None = None, is_active: str = "", page: int = 1, page_size: int = 20):
     try:
