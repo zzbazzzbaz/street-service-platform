@@ -16,3 +16,6 @@ backend/.env
 
 docs/**/.tmp_ocr/
 docs/_chat/
+
+# 视频录制
+视频录制/
