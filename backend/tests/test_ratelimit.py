@@ -57,8 +57,9 @@ class RateLimitPaymentTests(TestCase):
 
     def test_point_payment_rate_limited_after_20_requests(self):
         for i in range(20):
+            merchant = create_merchant(openid=f"rate-merchant-{i}", name=f"限速商户{i}")
             response = self.client.post(
-                f"/api/merchants/{self.merchant.id}/point-payments",
+                f"/api/merchants/{merchant.id}/point-payments",
                 {"points": 1, "request_no": f"req-{i}"},
                 content_type="application/json",
                 **self.headers,

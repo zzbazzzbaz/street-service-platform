@@ -110,7 +110,7 @@ class MerchantPointPaymentFlowTests(TestCase):
         add_points(self.member, 500, source_type=PointRecord.SourceType.MANUAL, reason="测试加分")
         june_first = pay_merchant_with_points(self.member, self.merchant, 100, request_no="june-first")
         june_second = pay_merchant_with_points(self.member, self.merchant, 200, request_no="june-second")
-        may_record = pay_merchant_with_points(self.member, self.merchant, 100, request_no="may")
+        may_record = pay_merchant_with_points(self.member, self.other_merchant, 100, request_no="may")
         other_record = pay_merchant_with_points(self.member, self.other_merchant, 100, request_no="other")
         PointRecord.objects.filter(pk__in=[june_first.pk, june_second.pk]).update(created_at=timezone.datetime(2026, 6, 10, tzinfo=timezone.get_current_timezone()))
         PointRecord.objects.filter(pk=may_record.pk).update(created_at=timezone.datetime(2026, 5, 10, tzinfo=timezone.get_current_timezone()))
@@ -166,6 +166,69 @@ class MerchantPointPaymentFlowTests(TestCase):
 
         self.assertEqual(data["member_name_masked"], "测*")
         self.assertEqual(data["member_phone_masked"], "138****0000")
+
+    def test_daily_payment_limit_allows_two_payments_per_merchant(self):
+        add_points(self.member, 500, source_type=PointRecord.SourceType.MANUAL, reason="测试加分")
+
+        first = pay_merchant_with_points(self.member, self.merchant, 100, request_no="day-1")
+        second = pay_merchant_with_points(self.member, self.merchant, 100, request_no="day-2")
+
+        self.assertNotEqual(first.id, second.id)
+        self.assertEqual(PointRecord.objects.filter(member=self.member, merchant=self.merchant).count(), 2)
+
+    def test_daily_payment_limit_rejects_third_payment_same_day(self):
+        add_points(self.member, 500, source_type=PointRecord.SourceType.MANUAL, reason="测试加分")
+        pay_merchant_with_points(self.member, self.merchant, 100, request_no="day-1")
+        pay_merchant_with_points(self.member, self.merchant, 100, request_no="day-2")
+
+        with self.assertRaises(BusinessError) as ctx:
+            pay_merchant_with_points(self.member, self.merchant, 100, request_no="day-3")
+
+        self.assertEqual(ctx.exception.status, 403)
+        self.assertIn("上限", ctx.exception.message)
+
+    def test_daily_payment_limit_isolated_per_merchant(self):
+        add_points(self.member, 500, source_type=PointRecord.SourceType.MANUAL, reason="测试加分")
+        pay_merchant_with_points(self.member, self.merchant, 100, request_no="m-1")
+        pay_merchant_with_points(self.member, self.merchant, 100, request_no="m-2")
+
+        record = pay_merchant_with_points(self.member, self.other_merchant, 100, request_no="m-other")
+
+        self.assertIsNotNone(record.id)
+        self.assertEqual(record.merchant_id, self.other_merchant.id)
+
+    def test_daily_payment_limit_does_not_block_idempotent_replay(self):
+        add_points(self.member, 500, source_type=PointRecord.SourceType.MANUAL, reason="测试加分")
+        pay_merchant_with_points(self.member, self.merchant, 100, request_no="replay")
+        pay_merchant_with_points(self.member, self.merchant, 100, request_no="day-2")
+
+        replay = pay_merchant_with_points(self.member, self.merchant, 100, request_no="replay")
+
+        self.assertEqual(replay.request_no, "replay")
+        self.assertEqual(PointRecord.objects.filter(member=self.member, merchant=self.merchant).count(), 2)
+
+    def test_daily_payment_limit_ignores_failed_payments(self):
+        add_points(self.member, 250, source_type=PointRecord.SourceType.MANUAL, reason="测试加分")
+        with self.assertRaisesRegex(BusinessError, "积分余额不足"):
+            pay_merchant_with_points(self.member, self.merchant, 300, request_no="fail")
+
+        pay_merchant_with_points(self.member, self.merchant, 100, request_no="ok-1")
+        pay_merchant_with_points(self.member, self.merchant, 100, request_no="ok-2")
+
+        self.assertEqual(PointRecord.objects.filter(member=self.member, merchant=self.merchant).count(), 2)
+
+    def test_daily_payment_limit_resets_next_day(self):
+        add_points(self.member, 500, source_type=PointRecord.SourceType.MANUAL, reason="测试加分")
+        first = pay_merchant_with_points(self.member, self.merchant, 100, request_no="yesterday-1")
+        second = pay_merchant_with_points(self.member, self.merchant, 100, request_no="yesterday-2")
+        PointRecord.objects.filter(pk__in=[first.pk, second.pk]).update(
+            created_at=timezone.datetime(2026, 8, 17, 12, 0, tzinfo=timezone.get_current_timezone())
+        )
+
+        today_record = pay_merchant_with_points(self.member, self.merchant, 100, request_no="today-1")
+
+        self.assertEqual(today_record.request_no, "today-1")
+        self.assertEqual(PointRecord.objects.filter(member=self.member, merchant=self.merchant).count(), 3)
 
 
 class MerchantSettlementsApiTests(TestCase):

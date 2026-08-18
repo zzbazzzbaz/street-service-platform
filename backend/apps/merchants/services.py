@@ -259,6 +259,30 @@ def _parse_local_date_end(value: str, tz):
     return timezone.make_aware(timezone.datetime.combine(date_value, timezone.datetime.max.time()), tz)
 
 
+DAILY_MERCHANT_PAYMENT_LIMIT = 2
+
+
+def _check_daily_payment_limit(member: Member, merchant: Merchant) -> None:
+    tz = timezone.get_current_timezone()
+    today = timezone.localdate()
+    day_start = timezone.make_aware(timezone.datetime.combine(today, timezone.datetime.min.time()), tz)
+    day_end = timezone.make_aware(timezone.datetime.combine(today, timezone.datetime.max.time()), tz)
+    today_count = PointRecord.objects.filter(
+        member=member,
+        merchant=merchant,
+        source_type=PointRecord.SourceType.MERCHANT_PAYMENT,
+        created_at__range=(day_start, day_end),
+    ).count()
+    if today_count >= DAILY_MERCHANT_PAYMENT_LIMIT:
+        logger.info(
+            "商户支付每日限额拦截 member=%s merchant=%s today_count=%d",
+            member.id,
+            merchant.id,
+            today_count,
+        )
+        raise BusinessError("今日在该商户支付已达 2 次上限，请明日再试", status=403, code=40003)
+
+
 @transaction.atomic
 def pay_merchant_with_points(member: Member, merchant: Merchant, points: int, *, request_no: str = "") -> PointRecord:
     points = int(points)
@@ -283,6 +307,7 @@ def pay_merchant_with_points(member: Member, merchant: Merchant, points: int, *,
                 existing.id,
             )
             return existing
+    _check_daily_payment_limit(member, merchant)
     rule = active_exchange_rule()
     yuan_amount = (Decimal(points) / Decimal(rule.points_per_yuan)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
     logger.info(
