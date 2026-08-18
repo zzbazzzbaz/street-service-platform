@@ -4,6 +4,7 @@ from django.test import TestCase
 
 from apps.merchants.models import MerchantPointCode
 from apps.merchants.services import (
+    pay_merchant_with_points,
     point_code_content,
     point_code_payment_preview,
     scan_point_code,
@@ -87,6 +88,28 @@ class MerchantPointCodeServiceTests(TestCase):
 
         with self.assertRaisesRegex(BusinessError, "商户已停用"):
             scan_point_code(self.member, self.point_code.code)
+
+    def test_scan_point_code_blocked_after_two_merchant_qr_payments_same_day(self):
+        add_points(self.member, 500, source_type=PointRecord.SourceType.MANUAL, reason="测试加分")
+        pay_merchant_with_points(self.member, self.merchant, 100, request_no="qr-1")
+        pay_merchant_with_points(self.member, self.merchant, 100, request_no="qr-2")
+
+        with self.assertRaises(BusinessError) as ctx:
+            scan_point_code(self.member, self.point_code.code)
+
+        self.assertEqual(ctx.exception.status, 403)
+        self.assertIn("上限", ctx.exception.message)
+
+    def test_pay_merchant_blocked_after_two_fixed_code_scans_same_day(self):
+        add_points(self.member, 500, source_type=PointRecord.SourceType.MANUAL, reason="测试加分")
+        scan_point_code(self.member, self.point_code.code, request_no="scan-1")
+        scan_point_code(self.member, self.point_code.code, request_no="scan-2")
+
+        with self.assertRaises(BusinessError) as ctx:
+            pay_merchant_with_points(self.member, self.merchant, 100)
+
+        self.assertEqual(ctx.exception.status, 403)
+        self.assertIn("上限", ctx.exception.message)
 
     def test_point_code_payment_preview_returns_info(self):
         add_points(self.member, 120, source_type=PointRecord.SourceType.MANUAL, reason="测试加分")

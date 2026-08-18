@@ -245,8 +245,9 @@ class MerchantPointPaymentFlowTests(TestCase):
         add_points(self.member, 500, source_type=PointRecord.SourceType.MANUAL, reason="测试加分")
         first = pay_merchant_with_points(self.member, self.merchant, 100, request_no="yesterday-1")
         second = pay_merchant_with_points(self.member, self.merchant, 100, request_no="yesterday-2")
+        yesterday = timezone.localdate() - timezone.timedelta(days=1)
         PointRecord.objects.filter(pk__in=[first.pk, second.pk]).update(
-            created_at=timezone.datetime(2026, 8, 17, 12, 0, tzinfo=timezone.get_current_timezone())
+            created_at=timezone.datetime.combine(yesterday, timezone.datetime.min.time(), tzinfo=timezone.get_current_timezone())
         )
 
         today_record = pay_merchant_with_points(self.member, self.merchant, 100, request_no="today-1")

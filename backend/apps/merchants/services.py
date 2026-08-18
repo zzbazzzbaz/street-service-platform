@@ -280,7 +280,7 @@ def _check_daily_payment_limit(member: Member, merchant: Merchant) -> None:
             merchant.id,
             today_count,
         )
-        raise BusinessError("今日在该商户支付已达 2 次上限，请明日再试", status=403, code=40003)
+        raise BusinessError(f"今日在该商户支付已达 {DAILY_MERCHANT_PAYMENT_LIMIT} 次上限，请明日再试", status=403, code=40003)
 
 
 @transaction.atomic
@@ -428,6 +428,7 @@ def scan_point_code(member: Member, code: str, *, request_no: str = "") -> Point
                 existing.id,
             )
             return existing
+    _check_daily_payment_limit(member, merchant)
     rule = active_exchange_rule()
     yuan_amount = (Decimal(points) / Decimal(rule.points_per_yuan)).quantize(
         Decimal("0.01"), rounding=ROUND_HALF_UP
