@@ -94,6 +94,30 @@ class MerchantPointPaymentFlowTests(TestCase):
         self.assertEqual(records_response.json()["data"]["total"], 1)
         self.assertEqual(records_response.json()["data"]["items"][0]["merchant_id"], self.merchant.id)
 
+    def test_merchant_payment_api_rejects_third_payment_same_day(self):
+        add_points(self.member, 500, source_type=PointRecord.SourceType.MANUAL, reason="测试加分")
+        member_headers = auth_header("member", self.member.openid)
+
+        for i in range(2):
+            response = self.client.post(
+                f"/api/merchants/{self.merchant.id}/point-payments",
+                {"points": 100, "request_no": f"api-{i}"},
+                content_type="application/json",
+                **member_headers,
+            )
+            self.assertEqual(response.status_code, 200)
+
+        response = self.client.post(
+            f"/api/merchants/{self.merchant.id}/point-payments",
+            {"points": 100, "request_no": "api-over"},
+            content_type="application/json",
+            **member_headers,
+        )
+
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.json()["code"], 40003)
+        self.assertIn("上限", response.json()["message"])
+
     def test_merchant_point_records_only_include_current_merchant(self):
         add_points(self.member, 300, source_type=PointRecord.SourceType.MANUAL, reason="测试加分")
         own_record = pay_merchant_with_points(self.member, self.merchant, 100, request_no="own")
