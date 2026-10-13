@@ -8,7 +8,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ('elder_services', '0005_elderservicefeedback_elder_address_and_more'),
-        ('members', '0005_remove_member_identity_type_member_address_and_more'),
+        ('members', '0005_member_address_member_gender_member_is_party_member_and_more'),
     ]
 
     operations = [
