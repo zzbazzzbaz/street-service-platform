@@ -27,8 +27,6 @@ router = Router(tags=["老人服务"])
 def my_relation(request):
     try:
         member = require_approved_member(request)
-        if member.identity_type != "courier":
-            raise BusinessError("当前用户无权限访问", code=40301, status=403)
     except TokenError as exc:
         return error_response(40001, str(exc), status=401)
     except BusinessError as exc:
@@ -100,7 +98,7 @@ def task_detail(request, task_id: int):
 @router.post("/tasks/{task_id}/feedback", response={200: SuccessResponse[ElderServiceFeedbackOut], 400: ErrorResponse, 401: ErrorResponse, 403: ErrorResponse, 404: ErrorResponse})
 def submit_task_feedback(request, task_id: int, payload: FeedbackIn):
     try:
-        member = authenticate_member(request)
+        member = require_approved_member(request)
         task = get_object_or_404(ElderServiceTask, pk=task_id)
         feedback = submit_feedback(member, task, content=payload.content, image_urls=payload.image_urls)
     except TokenError as exc:

@@ -9,7 +9,6 @@ class MyRelationApiTests(TestCase):
     def setUp(self):
         self.member = create_member(
             openid="courier-openid",
-            identity_type=Member.IdentityType.COURIER,
             audit_status=Member.AuditStatus.APPROVED,
         )
         self.relation = ElderCareRelation.objects.create(
@@ -34,7 +33,6 @@ class MyRelationApiTests(TestCase):
     def test_returns_null_when_no_relation(self):
         no_relation_member = create_member(
             openid="no-relation-openid",
-            identity_type=Member.IdentityType.COURIER,
             audit_status=Member.AuditStatus.APPROVED,
         )
         response = self.client.get(
@@ -54,24 +52,35 @@ class MyRelationApiTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIsNone(response.json()["data"])
 
-    def test_normal_user_cannot_access(self):
+    def test_approved_user_without_courier_identity_can_access(self):
         normal = create_member(
             openid="normal-openid",
-            identity_type=Member.IdentityType.NORMAL_USER,
             audit_status=Member.AuditStatus.APPROVED,
         )
         response = self.client.get(
             "/api/elder-services/my-relation",
             **auth_header("member", normal.openid),
         )
+        self.assertEqual(response.status_code, 200)
+        self.assertIsNone(response.json()["data"])
+
+    def test_pending_user_cannot_access(self):
+        pending = create_member(
+            openid="pending-elder-openid",
+            audit_status=Member.AuditStatus.PENDING,
+        )
+        response = self.client.get(
+            "/api/elder-services/my-relation",
+            **auth_header("member", pending.openid),
+        )
         self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.json()["message"], "当前用户资料未审核通过")
 
 
 class DirectFeedbackApiTests(TestCase):
     def setUp(self):
         self.member = create_member(
             openid="courier-openid",
-            identity_type=Member.IdentityType.COURIER,
             audit_status=Member.AuditStatus.APPROVED,
         )
         self.relation = ElderCareRelation.objects.create(
@@ -108,7 +117,6 @@ class DirectFeedbackApiTests(TestCase):
     def test_submit_feedback_without_relation_returns_403(self):
         no_relation = create_member(
             openid="no-relation-openid",
-            identity_type=Member.IdentityType.COURIER,
             audit_status=Member.AuditStatus.APPROVED,
         )
         response = self.client.post(

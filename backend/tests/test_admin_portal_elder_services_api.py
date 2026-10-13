@@ -12,7 +12,6 @@ class AdminPortalElderServicesApiTests(TestCase):
         self.headers = admin_auth_header(self.admin)
         self.courier = create_member(
             openid="courier-openid",
-            identity_type=Member.IdentityType.COURIER,
             audit_status=Member.AuditStatus.APPROVED,
         )
 
@@ -64,18 +63,18 @@ class AdminPortalElderServicesApiTests(TestCase):
         self.assertEqual(relation_status.status_code, 200)
         self.assertFalse(relation_status.json()["data"]["is_active"])
 
-    def test_relation_requires_approved_active_courier(self):
-        normal = create_member(openid="normal-openid", identity_type=Member.IdentityType.NORMAL_USER)
+    def test_relation_requires_approved_active_member(self):
+        pending = create_member(openid="normal-openid", audit_status=Member.AuditStatus.PENDING)
 
         response = self.client.post(
             "/api/admin/elder-services/relations",
-            {"member_id": normal.id, "elder_name": "刘阿姨", "elder_address": "幸福小区"},
+            {"member_id": pending.id, "elder_name": "刘阿姨", "elder_address": "幸福小区"},
             content_type="application/json",
             **self.headers,
         )
 
         self.assertEqual(response.status_code, 400)
-        self.assertIn("小哥", response.json()["message"])
+        self.assertIn("用户", response.json()["message"])
 
 
 class AdminElderFeedbackUpdateTests(TestCase):
@@ -84,7 +83,6 @@ class AdminElderFeedbackUpdateTests(TestCase):
         self.headers = admin_auth_header(self.admin)
         self.courier = create_member(
             openid="courier-openid",
-            identity_type=Member.IdentityType.COURIER,
             audit_status=Member.AuditStatus.APPROVED,
         )
         self.relation = ElderCareRelation.objects.create(

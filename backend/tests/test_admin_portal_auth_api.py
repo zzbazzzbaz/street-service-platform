@@ -134,8 +134,10 @@ class AdminPortalAuthApiTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         data = response.json()["data"]
-        self.assertIn({"value": "courier", "label": "小哥"}, data["member_identity_types"])
         self.assertIn({"value": "pending", "label": "待审核"}, data["member_audit_statuses"])
+        self.assertIn({"value": "男", "label": "男"}, data["member_genders"])
+        self.assertIn({"value": "顺丰快递", "label": "顺丰快递"}, data["member_occupations"])
+        self.assertIn({"value": "pending", "label": "待审核"}, data["merchant_audit_statuses"])
         self.assertIn({"value": "article", "label": "图文文章"}, data["learning_content_types"])
         self.assertIn({"value": "safety_hazard", "label": "安全隐患"}, data["report_category_codes"])
         self.assertIn({"value": "merchant_payment", "label": "商户积分支付"}, data["point_source_types"])
@@ -186,6 +188,7 @@ class AdminPortalAuthApiTests(TestCase):
             response.json()["data"],
             {
                 "pending_member_audits": 1,
+                "pending_merchant_audits": 0,
                 "pending_reports": 1,
                 "pending_civic_feedbacks": 1,
                 "pending_problem_feedbacks": 1,

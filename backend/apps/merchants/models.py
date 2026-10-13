@@ -10,13 +10,21 @@ class Merchant(models.Model):
         LIFE_SERVICE = "life_service", "生活服务"
         OTHER = "other", "其他"
 
-    openid = models.CharField("OpenID", max_length=128, unique=True)
+    class AuditStatus(models.TextChoices):
+        NONE = "none", "未提交"
+        PENDING = "pending", "待审核"
+        APPROVED = "approved", "已通过"
+        REJECTED = "rejected", "已驳回"
+
+    openid = models.CharField("OpenID", max_length=128, unique=True, null=True, blank=True)
     username = models.CharField("用户名", max_length=64, unique=True, null=True, blank=True)
     password = models.CharField("密码", max_length=128, blank=True)
     name = models.CharField("商户名称", max_length=100)
     contact_name = models.CharField("联系人", max_length=50, blank=True)
     phone = models.CharField("手机号", max_length=20, blank=True)
     address = models.CharField("经营地址", max_length=255, blank=True)
+    community = models.CharField("所属社区", max_length=100, blank=True)
+    merchant_nature = models.CharField("商户性质", max_length=100, blank=True)
     latitude = models.FloatField("纬度", null=True, blank=True)
     longitude = models.FloatField("经度", null=True, blank=True)
     category_code = models.CharField(
@@ -27,6 +35,13 @@ class Merchant(models.Model):
     )
     business_hours = models.CharField("营业时间", max_length=100, blank=True)
     service_content = models.TextField("服务内容", blank=True)
+    audit_status = models.CharField(
+        "审核状态",
+        max_length=20,
+        choices=AuditStatus.choices,
+        default=AuditStatus.NONE,
+    )
+    audit_remark = models.CharField("审核意见", max_length=255, blank=True)
     is_active = models.BooleanField("是否启用", default=True)
     created_at = models.DateTimeField("创建时间", auto_now_add=True)
 
@@ -35,6 +50,13 @@ class Merchant(models.Model):
         verbose_name = "商户"
         verbose_name_plural = "商户"
         ordering = ("-created_at", "-id")
+        constraints = [
+            models.UniqueConstraint(
+                fields=["phone"],
+                condition=~models.Q(phone=""),
+                name="uniq_merchant_phone_when_present",
+            ),
+        ]
 
     def __str__(self) -> str:
         return self.name

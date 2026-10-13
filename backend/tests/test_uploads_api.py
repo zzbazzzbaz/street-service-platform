@@ -39,6 +39,32 @@ class UploadsApiTests(TestCase):
         self.assertTrue(file_data["url"].startswith("http://testserver/media/uploads/merchant_product/"))
         self.assertEqual(file_data["mime_type"], "image/png")
 
+    def test_pending_merchant_can_upload_but_disabled_merchant_cannot(self):
+        pending = create_merchant(
+            openid="pending-upload-openid",
+            audit_status="pending",
+            is_active=False,
+        )
+        allowed = self.client.post(
+            "/api/uploads/images",
+            {"business_type": "merchant", "files": [image_file("shop.jpg")]},
+            **auth_header("merchant", pending.openid),
+        )
+        disabled = create_merchant(
+            openid="disabled-upload-openid",
+            audit_status="approved",
+            is_active=False,
+        )
+        denied = self.client.post(
+            "/api/uploads/images",
+            {"business_type": "merchant", "files": [image_file("shop.jpg")]},
+            **auth_header("merchant", disabled.openid),
+        )
+
+        self.assertEqual(allowed.status_code, 200)
+        self.assertEqual(denied.status_code, 403)
+        self.assertEqual(denied.json()["message"], "当前账号已停用")
+
     def test_upload_rejects_invalid_mime_type(self):
         response = self.client.post(
             "/api/uploads/images",

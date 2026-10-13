@@ -5,7 +5,7 @@ from apps.core.services import save_uploaded_images
 from shared.api import ErrorResponse, SuccessResponse, error_response, success_response
 from shared.auth import TokenError, get_token_identity
 from shared.exceptions import BusinessError
-from shared.services import authenticate_member, authenticate_merchant
+from shared.services import authenticate_member, authenticate_merchant_for_audit
 
 
 router = Router(tags=["上传"])
@@ -16,7 +16,8 @@ def authenticate_upload_subject(request):
     if identity.subject_type == "member":
         return authenticate_member(request)
     if identity.subject_type == "merchant":
-        return authenticate_merchant(request)
+        # 审核中的商户也可上传（例如补充门店照片），已通过但被停用的商户仍拒绝
+        return authenticate_merchant_for_audit(request)
     raise TokenError("token 主体类型错误")
 
 

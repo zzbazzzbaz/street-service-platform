@@ -34,8 +34,9 @@ class ChoiceItemOut(Schema):
 
 
 class AdminEnumsOut(Schema):
-    member_identity_types: list[ChoiceItemOut]
     member_audit_statuses: list[ChoiceItemOut]
+    member_genders: list[ChoiceItemOut]
+    member_occupations: list[ChoiceItemOut]
     learning_content_types: list[ChoiceItemOut]
     report_category_codes: list[ChoiceItemOut]
     report_statuses: list[ChoiceItemOut]
@@ -51,10 +52,12 @@ class AdminEnumsOut(Schema):
     merchant_settlement_period_types: list[ChoiceItemOut]
     merchant_settlement_statuses: list[ChoiceItemOut]
     merchant_category_codes: list[ChoiceItemOut]
+    merchant_audit_statuses: list[ChoiceItemOut]
 
 
 class AdminDashboardSummaryOut(Schema):
     pending_member_audits: int
+    pending_merchant_audits: int
     pending_reports: int
     pending_civic_feedbacks: int
     pending_problem_feedbacks: int
@@ -94,10 +97,19 @@ class MemberUpdateIn(Schema):
     nickname: str = ""
     phone: str = ""
     real_name: str = ""
-    identity_type: str = ""
+    wechat_id: str | None = None
+    gender: str | None = None
+    occupation: str | None = None
+    is_party_member: bool | None = None
+    address: str | None = None
 
 
 class MemberAuditIn(Schema):
+    action: str
+    remark: str = ""
+
+
+class MerchantAuditIn(Schema):
     action: str
     remark: str = ""
 
@@ -302,6 +314,8 @@ class MerchantIn(Schema):
     contact_name: str = ""
     phone: str = ""
     address: str = ""
+    community: str = ""
+    merchant_nature: str = ""
     latitude: float | None = None
     longitude: float | None = None
     category_code: str = "other"
@@ -317,6 +331,8 @@ class MerchantUpdateIn(Schema):
     contact_name: str | None = None
     phone: str | None = None
     address: str | None = None
+    community: str | None = None
+    merchant_nature: str | None = None
     latitude: float | None = None
     longitude: float | None = None
     category_code: str | None = None

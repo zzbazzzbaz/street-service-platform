@@ -84,8 +84,9 @@ def login_admin(username: str, password: str) -> dict:
 
 def enum_data() -> dict:
     return {
-        "member_identity_types": _choices(Member.IdentityType.choices),
         "member_audit_statuses": _choices(Member.AuditStatus.choices),
+        "member_genders": _choices(Member.Gender.choices),
+        "member_occupations": _choices(Member.Occupation.choices),
         "learning_content_types": _choices(LearningContent.ContentType.choices),
         "report_category_codes": _choices(Report.CategoryCode.choices),
         "report_statuses": _choices(Report.Status.choices),
@@ -101,6 +102,7 @@ def enum_data() -> dict:
         "merchant_settlement_period_types": _choices(MerchantSettlement.PeriodType.choices),
         "merchant_settlement_statuses": _choices(MerchantSettlement.Status.choices),
         "merchant_category_codes": _choices(Merchant.CategoryCode.choices),
+        "merchant_audit_statuses": _choices(Merchant.AuditStatus.choices),
     }
 
 
@@ -113,6 +115,7 @@ def dashboard_summary_data() -> dict:
     total_points = merchant_payments.aggregate(total=Sum("amount"))["total"] or 0
     return {
         "pending_member_audits": Member.objects.filter(audit_status=Member.AuditStatus.PENDING).count(),
+        "pending_merchant_audits": Merchant.objects.filter(audit_status=Merchant.AuditStatus.PENDING).count(),
         "pending_reports": Report.objects.filter(status=Report.Status.PENDING).count(),
         "pending_civic_feedbacks": CivicFeedback.objects.filter(status=CivicFeedback.Status.SUBMITTED).count(),
         "pending_problem_feedbacks": ProblemFeedback.objects.filter(status=ProblemFeedback.Status.SUBMITTED).count(),
@@ -206,13 +209,19 @@ def reset_admin_user_password(user_id: int, *, password: str) -> dict:
     return {"id": user.id, "password_reset": True}
 
 
-def members_data(*, keyword: str = "", identity_type: str = "", audit_status: str = "", is_active: str = "", page: int = 1, page_size: int = 20) -> dict:
+def members_data(*, keyword: str = "", audit_status: str = "", is_active: str = "", page: int = 1, page_size: int = 20) -> dict:
     queryset = Member.objects.all()
     keyword = keyword.strip()
     if keyword:
-        queryset = queryset.filter(Q(openid__icontains=keyword) | Q(username__icontains=keyword) | Q(nickname__icontains=keyword) | Q(phone__icontains=keyword) | Q(real_name__icontains=keyword))
-    if identity_type:
-        queryset = queryset.filter(identity_type=identity_type)
+        queryset = queryset.filter(
+            Q(openid__icontains=keyword)
+            | Q(username__icontains=keyword)
+            | Q(nickname__icontains=keyword)
+            | Q(phone__icontains=keyword)
+            | Q(real_name__icontains=keyword)
+            | Q(wechat_id__icontains=keyword)
+            | Q(address__icontains=keyword)
+        )
     if audit_status:
         queryset = queryset.filter(audit_status=audit_status)
     if is_active in {"true", "false"}:
@@ -222,14 +231,44 @@ def members_data(*, keyword: str = "", identity_type: str = "", audit_status: st
 
 def update_member(member_id: int, payload) -> dict:
     member = get_or_404(Member, member_id)
-    if payload.identity_type and payload.identity_type not in Member.IdentityType.values:
-        raise BusinessError("身份类型不支持")
+    old_phone = member.phone
+    phone = payload.phone.strip()
+    if phone and phone != old_phone:
+        conflict = Member.objects.filter(Q(phone=phone) | Q(username=phone)).exclude(pk=member.pk).exists()
+        if conflict:
+            raise BusinessError("该手机号已被其他账号使用", errors={"phone": ["该手机号已被其他账号使用"]})
     member.nickname = payload.nickname.strip()
-    member.phone = payload.phone.strip()
+    member.phone = phone
     member.real_name = payload.real_name.strip()
-    if payload.identity_type:
-        member.identity_type = payload.identity_type
-    member.save(update_fields=["nickname", "phone", "real_name", "identity_type"])
+    update_fields = ["nickname", "phone", "real_name"]
+    if phone and phone != old_phone and (not member.username or member.username == old_phone):
+        member.username = phone
+        update_fields.append("username")
+    if payload.wechat_id is not None:
+        member.wechat_id = payload.wechat_id.strip()
+        update_fields.append("wechat_id")
+    if payload.gender is not None:
+        gender = payload.gender.strip()
+        if gender and gender not in Member.Gender.values:
+            raise BusinessError("性别不正确", errors={"gender": ["性别不正确"]})
+        member.gender = gender
+        update_fields.append("gender")
+    if payload.occupation is not None:
+        occupation = payload.occupation.strip()
+        if occupation and occupation not in Member.Occupation.values:
+            raise BusinessError("职业不正确", errors={"occupation": ["职业不正确"]})
+        member.occupation = occupation
+        update_fields.append("occupation")
+    if payload.is_party_member is not None:
+        member.is_party_member = payload.is_party_member
+        update_fields.append("is_party_member")
+    if payload.address is not None:
+        address = payload.address.strip()
+        if len(address) > 255:
+            raise BusinessError("住址最多 255 字", errors={"address": ["住址最多 255 字"]})
+        member.address = address
+        update_fields.append("address")
+    member.save(update_fields=update_fields)
     return member_data(member)
 
 
@@ -674,8 +713,8 @@ def relation_data(relation: ElderCareRelation) -> dict:
 
 
 def validate_relation_member(member: Member) -> None:
-    if not member.is_active or member.identity_type != Member.IdentityType.COURIER or member.audit_status != Member.AuditStatus.APPROVED:
-        raise BusinessError("必须选择启用且审核通过的小哥")
+    if not member.is_active or member.audit_status != Member.AuditStatus.APPROVED:
+        raise BusinessError("必须选择启用且审核通过的用户")
 
 
 def create_relation(payload) -> ElderCareRelation:
@@ -846,13 +885,54 @@ def save_exchange_rule(rule: PointExchangeRule, *, points_per_yuan: int | None =
 # ---------------------------------------------------------------------------
 
 
-def merchants_data(*, keyword: str = "", is_active: str = "", page: int = 1, page_size: int = 20) -> dict:
+def merchants_data(*, keyword: str = "", is_active: str = "", audit_status: str = "", page: int = 1, page_size: int = 20) -> dict:
     queryset = Merchant.objects.all()
     if keyword:
-        queryset = queryset.filter(Q(openid__icontains=keyword) | Q(username__icontains=keyword) | Q(name__icontains=keyword) | Q(contact_name__icontains=keyword) | Q(phone__icontains=keyword))
+        queryset = queryset.filter(
+            Q(openid__icontains=keyword)
+            | Q(username__icontains=keyword)
+            | Q(name__icontains=keyword)
+            | Q(contact_name__icontains=keyword)
+            | Q(phone__icontains=keyword)
+            | Q(community__icontains=keyword)
+        )
     if is_active in {"true", "false"}:
         queryset = queryset.filter(is_active=is_active == "true")
+    if audit_status:
+        queryset = queryset.filter(audit_status=audit_status)
     return paginated_data(queryset, merchant_data, page=page, page_size=page_size)
+
+
+def audit_merchant(merchant_id: int, *, action: str, remark: str) -> dict:
+    merchant = get_or_404(Merchant, merchant_id)
+    action = (action or "").strip()
+    remark = (remark or "").strip()
+    if action == "approve":
+        merchant.audit_status = Merchant.AuditStatus.APPROVED
+        merchant.audit_remark = remark
+        merchant.is_active = True
+    elif action == "reject":
+        if not remark:
+            raise BusinessError("驳回必须填写审核意见")
+        merchant.audit_status = Merchant.AuditStatus.REJECTED
+        merchant.audit_remark = remark
+        merchant.is_active = False
+    else:
+        raise BusinessError("审核动作不支持")
+    merchant.save(update_fields=["audit_status", "audit_remark", "is_active"])
+    return merchant_data(merchant)
+
+
+def validate_merchant_phone(phone: str, *, exclude_id: int | None = None) -> str:
+    phone = (phone or "").strip()
+    if not phone:
+        return ""
+    queryset = Merchant.objects.filter(Q(phone=phone) | Q(username=phone))
+    if exclude_id is not None:
+        queryset = queryset.exclude(pk=exclude_id)
+    if queryset.exists():
+        raise BusinessError("该手机号已被其他商户使用", errors={"phone": ["该手机号已被其他商户使用"]})
+    return phone
 
 
 def validate_merchant_unique(openid: str, *, exclude_id: int | None = None) -> None:
@@ -919,6 +999,7 @@ def create_merchant(payload) -> Merchant:
     if not payload.name.strip():
         raise BusinessError("商户名称不能为空")
     validate_merchant_unique(payload.openid)
+    phone = validate_merchant_phone(payload.phone)
     username = validate_merchant_username(getattr(payload, "username", ""))
     password = (getattr(payload, "password", "") or "").strip()
     if username and not password:
@@ -928,31 +1009,40 @@ def create_merchant(payload) -> Merchant:
     validate_coordinates(payload.latitude, payload.longitude)
     category_code = validate_merchant_category(payload.category_code)
     return Merchant.objects.create(
-        openid=payload.openid.strip(),
+        openid=payload.openid.strip() or None,
         username=username or None,
         password=make_password(password) if username else "",
         name=payload.name.strip(),
         contact_name=payload.contact_name.strip(),
-        phone=payload.phone.strip(),
+        phone=phone,
         address=payload.address.strip(),
+        community=payload.community.strip(),
+        merchant_nature=payload.merchant_nature.strip(),
         latitude=payload.latitude,
         longitude=payload.longitude,
         category_code=category_code,
         business_hours=clean_business_hours(payload.business_hours),
         service_content=clean_service_content(payload.service_content),
+        audit_status=Merchant.AuditStatus.APPROVED,
         is_active=payload.is_active,
     )
 
 
 def update_merchant(merchant_id: int, payload) -> Merchant:
     merchant = get_or_404(Merchant, merchant_id)
+    old_phone = merchant.phone
     if payload.openid is not None:
         validate_merchant_unique(payload.openid, exclude_id=merchant.id)
-        merchant.openid = payload.openid.strip()
+        merchant.openid = payload.openid.strip() or None
     if getattr(payload, "username", None) is not None:
         username = validate_merchant_username(payload.username, exclude_id=merchant.id)
         merchant.username = username or None
-    for field in ["name", "contact_name", "phone", "address", "business_hours", "service_content", "is_active"]:
+    if payload.phone is not None:
+        phone = validate_merchant_phone(payload.phone, exclude_id=merchant.id)
+        merchant.phone = phone
+        if phone and phone != old_phone and (not merchant.username or merchant.username == old_phone):
+            merchant.username = validate_merchant_username(phone, exclude_id=merchant.id) or None
+    for field in ["name", "contact_name", "phone", "address", "community", "merchant_nature", "business_hours", "service_content", "is_active"]:
         value = getattr(payload, field)
         if value is not None:
             setattr(merchant, field, value.strip() if isinstance(value, str) else value)

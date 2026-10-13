@@ -13,7 +13,7 @@ def get_client_ip(request) -> str:
 def user_key(group, request) -> str:
     try:
         identity = get_token_identity(request)
-        identifier = identity.openid or str(identity.user_id or "")
+        identifier = str(identity.subject_id or "") or identity.openid or str(identity.user_id or "")
         return f"{identity.subject_type}:{identifier}"
     except TokenError:
         return f"ip:{get_client_ip(request)}"

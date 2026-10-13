@@ -13,21 +13,34 @@ class AdminPortalMembersApiTests(TestCase):
 
     def test_member_search_update_status_audit_and_points_overview(self):
         member = create_member(
-            openid="courier-openid",
+            openid="user-openid",
             nickname="王小哥",
             phone="13800000001",
             real_name="王强",
-            identity_type=Member.IdentityType.COURIER,
+            wechat_id="wangqiang_wx",
+            gender="男",
+            occupation="顺丰快递",
+            is_party_member=True,
+            address="幸福街道 1 号楼",
             audit_status=Member.AuditStatus.PENDING,
         )
         create_member(openid="other-openid", nickname="其他用户")
         add_points(member, 15, source_type=PointRecord.SourceType.MANUAL, reason="测试加分", operator=self.admin)
 
-        list_response = self.client.get("/api/admin/members?keyword=王小哥&audit_status=pending", **self.headers)
+        list_response = self.client.get("/api/admin/members?keyword=王强&audit_status=pending", **self.headers)
         detail_response = self.client.get(f"/api/admin/members/{member.id}", **self.headers)
         update_response = self.client.patch(
             f"/api/admin/members/{member.id}",
-            {"nickname": "王师傅", "phone": "13900000001", "real_name": "王强", "identity_type": "courier"},
+            {
+                "nickname": "王师傅",
+                "phone": "13900000001",
+                "real_name": "王强",
+                "wechat_id": "wangqiang_new",
+                "gender": "男",
+                "occupation": "京东快递",
+                "is_party_member": False,
+                "address": "幸福街道 2 号楼",
+            },
             content_type="application/json",
             **self.headers,
         )
@@ -50,6 +63,10 @@ class AdminPortalMembersApiTests(TestCase):
         self.assertEqual(detail_response.status_code, 200)
         self.assertEqual(update_response.status_code, 200)
         self.assertEqual(update_response.json()["data"]["nickname"], "王师傅")
+        self.assertEqual(update_response.json()["data"]["occupation"], "京东快递")
+        self.assertEqual(update_response.json()["data"]["address"], "幸福街道 2 号楼")
+        self.assertFalse(update_response.json()["data"]["is_party_member"])
+        self.assertEqual(update_response.json()["data"]["username"], "13900000001")
         self.assertEqual(audit_response.status_code, 200)
         self.assertEqual(audit_response.json()["data"]["audit_status"], "approved")
         self.assertEqual(status_response.status_code, 200)

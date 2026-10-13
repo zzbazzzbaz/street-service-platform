@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 from decimal import Decimal, ROUND_HALF_UP
+import re
 
 from django.conf import settings
-from django.contrib.auth.hashers import check_password
-from django.db.models import Sum
-from django.db import transaction
+from django.contrib.auth.hashers import check_password, make_password
+from django.db.models import Q, Sum
+from django.db import IntegrityError, transaction
 from django.utils import timezone
 from uuid import uuid4
 import logging
@@ -17,26 +18,34 @@ from apps.points.services import deduct_points, get_or_create_account
 from shared.auth import issue_token
 from shared.exceptions import BusinessError
 from shared.privacy import mask_name, mask_phone
+from shared.validators import clean_phone
 from shared.wechat import code_to_openid as wechat_code_to_openid
 from shared.wechat import phone_code_to_phone as wechat_phone_code_to_phone
 
 logger = logging.getLogger("street.merchants")
 
+INITIAL_PASSWORD = "000000"
+BUSINESS_HOURS_PATTERN = re.compile(r"^([01]\d|2[0-3]):([0-5]\d)-([01]\d|2[0-3]):([0-5]\d)$")
+
 
 def merchant_data(merchant: Merchant) -> dict:
     return {
         "id": merchant.id,
-        "openid": merchant.openid,
+        "openid": merchant.openid or "",
         "username": merchant.username or "",
         "name": merchant.name,
         "contact_name": merchant.contact_name,
         "phone": merchant.phone,
         "address": merchant.address,
+        "community": merchant.community,
+        "merchant_nature": merchant.merchant_nature,
         "latitude": merchant.latitude,
         "longitude": merchant.longitude,
         "category_code": merchant.category_code,
         "business_hours": merchant.business_hours,
         "service_content": merchant.service_content,
+        "audit_status": merchant.audit_status,
+        "audit_remark": merchant.audit_remark,
         "is_active": merchant.is_active,
     }
 
@@ -57,18 +66,38 @@ def public_merchant_data(merchant: Merchant) -> dict:
     }
 
 
-def test_login(openid: str) -> dict:
-    openid = openid.strip()
-    if not openid:
-        raise BusinessError("openid 不能为空")
-    merchant, _ = Merchant.objects.get_or_create(openid=openid, defaults={"name": f"测试商户-{openid}"})
-    token, expires_in = issue_token(subject_type="merchant", openid=openid)
+def _login_payload(merchant: Merchant) -> dict:
+    token, expires_in = issue_token(
+        subject_type="merchant",
+        openid=merchant.openid or "",
+        subject_id=merchant.pk,
+    )
     return {
         "access_token": token,
         "token_type": "Bearer",
         "expires_in": expires_in,
         "merchant": merchant_data(merchant),
     }
+
+
+def test_login(openid: str) -> dict:
+    openid = openid.strip()
+    if not openid:
+        raise BusinessError("openid 不能为空")
+    merchant, _ = Merchant.objects.get_or_create(
+        openid=openid,
+        defaults={
+            "name": f"测试商户-{openid}",
+            "audit_status": Merchant.AuditStatus.APPROVED,
+        },
+    )
+    return _login_payload(merchant)
+
+
+def _ensure_login_allowed(merchant: Merchant) -> None:
+    """登录放行规则：待审核/已驳回允许登录（仅可查看状态、重提资料、改密），其余停用账号拒绝。"""
+    if not merchant.is_active and merchant.audit_status not in {Merchant.AuditStatus.PENDING, Merchant.AuditStatus.REJECTED}:
+        raise BusinessError("当前账号已停用", code=40301, status=403)
 
 
 def password_login(username: str, password: str) -> dict:
@@ -80,15 +109,214 @@ def password_login(username: str, password: str) -> dict:
         raise BusinessError("用户名或密码错误", code=40000, status=400)
     if not check_password(password, merchant.password):
         raise BusinessError("用户名或密码错误", code=40000, status=400)
-    if not merchant.is_active:
-        raise BusinessError("当前账号已停用", code=40301, status=403)
-    token, expires_in = issue_token(subject_type="merchant", openid=merchant.openid)
-    return {
-        "access_token": token,
-        "token_type": "Bearer",
-        "expires_in": expires_in,
-        "merchant": merchant_data(merchant),
-    }
+    _ensure_login_allowed(merchant)
+    return _login_payload(merchant)
+
+
+def _clean_registration_business_hours(value: str) -> str:
+    value = (value or "").strip()
+    match = BUSINESS_HOURS_PATTERN.match(value)
+    if match is None:
+        raise BusinessError(
+            "营业时间格式必须为 HH:MM-HH:MM",
+            errors={"business_hours": ["营业时间格式必须为 HH:MM-HH:MM"]},
+        )
+    start_hour, start_minute, end_hour, end_minute = (int(part) for part in match.groups())
+    if end_hour * 60 + end_minute <= start_hour * 60 + start_minute:
+        raise BusinessError(
+            "营业时间结束时间必须晚于开始时间",
+            errors={"business_hours": ["营业时间结束时间必须晚于开始时间"]},
+        )
+    return value
+
+
+def _clean_shop_name(value: str) -> str:
+    shop_name = (value or "").strip()
+    if not shop_name:
+        raise BusinessError("店铺名称不能为空", errors={"shop_name": ["店铺名称不能为空"]})
+    if len(shop_name) > 100:
+        raise BusinessError("店铺名称最多 100 字", errors={"shop_name": ["店铺名称最多 100 字"]})
+    return shop_name
+
+
+def _clean_shop_address(value: str) -> str:
+    shop_address = (value or "").strip()
+    if not shop_address:
+        raise BusinessError("店铺地址不能为空", errors={"shop_address": ["店铺地址不能为空"]})
+    if len(shop_address) > 255:
+        raise BusinessError("店铺地址最多 255 字", errors={"shop_address": ["店铺地址最多 255 字"]})
+    return shop_address
+
+
+def _clean_service_content(value: str) -> str:
+    service_content = (value or "").strip()
+    if not service_content:
+        raise BusinessError("服务内容不能为空", errors={"service_content": ["服务内容不能为空"]})
+    if len(service_content) > 500:
+        raise BusinessError("服务内容最多 500 字", errors={"service_content": ["服务内容最多 500 字"]})
+    return service_content
+
+
+def _clean_community(value: str) -> str:
+    community = (value or "").strip()
+    if not community:
+        raise BusinessError("所属社区不能为空", errors={"community": ["所属社区不能为空"]})
+    if len(community) > 100:
+        raise BusinessError("所属社区最多 100 字", errors={"community": ["所属社区最多 100 字"]})
+    return community
+
+
+def _clean_merchant_nature(value: str) -> str:
+    merchant_nature = (value or "").strip()
+    if not merchant_nature:
+        raise BusinessError("商户性质不能为空", errors={"merchant_nature": ["商户性质不能为空"]})
+    if len(merchant_nature) > 100:
+        raise BusinessError("商户性质最多 100 字", errors={"merchant_nature": ["商户性质最多 100 字"]})
+    return merchant_nature
+
+
+def _clean_contact_name(value: str) -> str:
+    contact_name = (value or "").strip()
+    if not contact_name:
+        raise BusinessError("联系人不能为空", errors={"contact_name": ["联系人不能为空"]})
+    if len(contact_name) > 50:
+        raise BusinessError("联系人最多 50 字", errors={"contact_name": ["联系人最多 50 字"]})
+    return contact_name
+
+
+def _ensure_phone_available(
+    phone: str,
+    *,
+    message: str = "该手机号已注册",
+    exclude_merchant_id: int | None = None,
+) -> None:
+    queryset = Merchant.objects.filter(Q(phone=phone) | Q(username=phone))
+    if exclude_merchant_id:
+        queryset = queryset.exclude(pk=exclude_merchant_id)
+    if queryset.exists():
+        raise BusinessError(message, errors={"contact_phone": [message]})
+
+
+def register_merchant(
+    *,
+    shop_name: str,
+    shop_address: str,
+    service_content: str,
+    community: str,
+    merchant_nature: str,
+    contact_name: str,
+    contact_phone: str,
+    business_hours: str,
+) -> dict:
+    shop_name = _clean_shop_name(shop_name)
+    shop_address = _clean_shop_address(shop_address)
+    service_content = _clean_service_content(service_content)
+    community = _clean_community(community)
+    merchant_nature = _clean_merchant_nature(merchant_nature)
+    contact_name = _clean_contact_name(contact_name)
+    contact_phone = clean_phone(contact_phone, field="contact_phone")
+    business_hours = _clean_registration_business_hours(business_hours)
+
+    _ensure_phone_available(contact_phone)
+
+    try:
+        merchant = Merchant.objects.create(
+            openid=None,
+            username=contact_phone,
+            password=make_password(INITIAL_PASSWORD),
+            name=shop_name,
+            contact_name=contact_name,
+            phone=contact_phone,
+            address=shop_address,
+            community=community,
+            merchant_nature=merchant_nature,
+            business_hours=business_hours,
+            service_content=service_content,
+            audit_status=Merchant.AuditStatus.PENDING,
+            is_active=False,
+        )
+    except IntegrityError as exc:
+        raise BusinessError("该手机号已注册", errors={"contact_phone": ["该手机号已注册"]}) from exc
+
+    payload = _login_payload(merchant)
+    payload["need_audit"] = True
+    return payload
+
+
+def resubmit_register_info(
+    merchant: Merchant,
+    *,
+    shop_name: str,
+    shop_address: str,
+    service_content: str,
+    community: str,
+    merchant_nature: str,
+    contact_name: str,
+    business_hours: str,
+    contact_phone: str = "",
+) -> dict:
+    if merchant.audit_status == Merchant.AuditStatus.PENDING:
+        raise BusinessError("资料审核中，请等待审核结果")
+    if merchant.audit_status == Merchant.AuditStatus.APPROVED:
+        raise BusinessError("审核已通过，如需修改资料请联系街道工作人员")
+
+    shop_name = _clean_shop_name(shop_name)
+    shop_address = _clean_shop_address(shop_address)
+    service_content = _clean_service_content(service_content)
+    community = _clean_community(community)
+    merchant_nature = _clean_merchant_nature(merchant_nature)
+    contact_name = _clean_contact_name(contact_name)
+    business_hours = _clean_registration_business_hours(business_hours)
+
+    update_fields = [
+        "name",
+        "address",
+        "service_content",
+        "community",
+        "merchant_nature",
+        "contact_name",
+        "business_hours",
+        "audit_status",
+        "audit_remark",
+    ]
+    merchant.name = shop_name
+    merchant.address = shop_address
+    merchant.service_content = service_content
+    merchant.community = community
+    merchant.merchant_nature = merchant_nature
+    merchant.contact_name = contact_name
+    merchant.business_hours = business_hours
+    merchant.audit_status = Merchant.AuditStatus.PENDING
+    merchant.audit_remark = ""
+
+    if not merchant.phone:
+        contact_phone = clean_phone(contact_phone, field="contact_phone")
+        _ensure_phone_available(contact_phone, message="该手机号已被其他商户使用", exclude_merchant_id=merchant.pk)
+        merchant.phone = contact_phone
+        update_fields.append("phone")
+    if merchant.phone and not merchant.username:
+        _ensure_phone_available(merchant.phone, message="该手机号已被其他商户使用", exclude_merchant_id=merchant.pk)
+        merchant.username = merchant.phone
+        update_fields.append("username")
+
+    merchant.save(update_fields=update_fields)
+    return merchant_data(merchant)
+
+
+def change_password(merchant: Merchant, *, current_password: str, new_password: str) -> dict:
+    current_password = current_password or ""
+    new_password = new_password or ""
+    if not merchant.password:
+        raise BusinessError("账号未设置密码，请联系街道工作人员")
+    if not check_password(current_password, merchant.password):
+        raise BusinessError("当前密码错误", errors={"current_password": ["当前密码错误"]})
+    if len(new_password) < 6:
+        raise BusinessError("新密码长度至少 6 位", errors={"new_password": ["新密码长度至少 6 位"]})
+    if check_password(new_password, merchant.password):
+        raise BusinessError("新密码不能与当前密码相同", errors={"new_password": ["新密码不能与当前密码相同"]})
+    merchant.password = make_password(new_password)
+    merchant.save(update_fields=["password"])
+    return {}
 
 
 def wechat_login_placeholder(code: str) -> dict:
@@ -109,18 +337,15 @@ def wechat_phone_login(login_code: str, phone_code: str) -> dict:
         raise BusinessError("商户微信手机号登录未配置", code=40000)
     openid = wechat_code_to_openid(login_code)
     phone = wechat_phone_code_to_phone(phone_code)
-    merchant = Merchant.objects.filter(phone=phone, is_active=True).first()
+    merchant = Merchant.objects.filter(phone=phone).order_by("id").first()
     if merchant is None:
         raise BusinessError("商户账号不存在或未启用", code=40301, status=403)
+    _ensure_login_allowed(merchant)
+    if Merchant.objects.filter(openid=openid).exclude(pk=merchant.pk).exists():
+        raise BusinessError("该微信已绑定其他商户账号", code=40301, status=403)
     merchant.openid = openid
     merchant.save(update_fields=["openid"])
-    token, expires_in = issue_token(subject_type="merchant", openid=openid)
-    return {
-        "access_token": token,
-        "token_type": "Bearer",
-        "expires_in": expires_in,
-        "merchant": merchant_data(merchant),
-    }
+    return _login_payload(merchant)
 
 
 def active_exchange_rule() -> PointExchangeRule:

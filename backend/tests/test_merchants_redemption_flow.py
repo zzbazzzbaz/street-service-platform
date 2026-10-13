@@ -13,7 +13,7 @@ from tests.helpers import auth_header, create_member, create_merchant
 
 class MerchantPointPaymentFlowTests(TestCase):
     def setUp(self):
-        self.member = create_member()
+        self.member = create_member(phone="13800000000")
         self.merchant = create_merchant()
         self.other_merchant = create_merchant(openid="other-merchant", name="其他商户")
         PointExchangeRule.objects.create(points_per_yuan=100, is_active=True)

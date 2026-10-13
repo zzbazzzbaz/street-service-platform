@@ -36,6 +36,7 @@ from apps.admin_portal.schemas import (
     ManualAdjustmentCreateIn,
     MemberAuditIn,
     MemberUpdateIn,
+    MerchantAuditIn,
     MerchantIn,
     MerchantPointCodeCreateIn,
     MerchantPointCodeUpdateIn,
@@ -183,10 +184,10 @@ def admin_user_update(request, user_id: int, payload: AdminUserUpdateIn):
 
 
 @router.get("/members", response={200: SuccessResponse[dict], 401: ErrorResponse, 403: ErrorResponse})
-def admin_members(request, keyword: str = "", identity_type: str = "", audit_status: str = "", is_active: str = "", page: int = 1, page_size: int = 20):
+def admin_members(request, keyword: str = "", audit_status: str = "", is_active: str = "", page: int = 1, page_size: int = 20):
     try:
         _admin_or_error(request)
-        return success_response(svc.members_data(keyword=keyword, identity_type=identity_type, audit_status=audit_status, is_active=is_active, page=page, page_size=page_size))
+        return success_response(svc.members_data(keyword=keyword, audit_status=audit_status, is_active=is_active, page=page, page_size=page_size))
     except BusinessError as exc:
         return _business_error(exc)
 
@@ -1026,10 +1027,19 @@ def admin_settlement_process(request, settlement_id: int, payload: SettlementPro
 
 
 @router.get("/merchants", response={200: SuccessResponse[dict], 401: ErrorResponse, 403: ErrorResponse})
-def admin_merchants(request, keyword: str = "", is_active: str = "", page: int = 1, page_size: int = 20):
+def admin_merchants(request, keyword: str = "", is_active: str = "", audit_status: str = "", page: int = 1, page_size: int = 20):
     try:
         _admin_or_error(request)
-        return success_response(svc.merchants_data(keyword=keyword, is_active=is_active, page=page, page_size=page_size))
+        return success_response(svc.merchants_data(keyword=keyword, is_active=is_active, audit_status=audit_status, page=page, page_size=page_size))
+    except BusinessError as exc:
+        return _business_error(exc)
+
+
+@router.post("/merchants/{merchant_id}/audit", response={200: SuccessResponse[dict], 400: ErrorResponse, 401: ErrorResponse, 403: ErrorResponse, 404: ErrorResponse})
+def admin_merchant_audit(request, merchant_id: int, payload: MerchantAuditIn):
+    try:
+        _admin_or_error(request)
+        return success_response(svc.audit_merchant(merchant_id, action=payload.action, remark=payload.remark))
     except BusinessError as exc:
         return _business_error(exc)
 

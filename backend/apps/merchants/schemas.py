@@ -27,12 +27,38 @@ class MerchantOut(Schema):
     contact_name: str
     phone: str
     address: str
+    community: str
+    merchant_nature: str
     latitude: float | None = None
     longitude: float | None = None
     category_code: str
     business_hours: str
     service_content: str
+    audit_status: str
+    audit_remark: str
     is_active: bool
+
+
+class MerchantRegisterIn(Schema):
+    shop_name: str
+    shop_address: str
+    service_content: str
+    community: str
+    merchant_nature: str
+    contact_name: str
+    contact_phone: str
+    business_hours: str
+
+
+class MerchantRegisterInfoIn(Schema):
+    shop_name: str
+    shop_address: str
+    service_content: str
+    community: str
+    merchant_nature: str
+    contact_name: str
+    business_hours: str
+    contact_phone: str = ""
 
 
 class MerchantLoginOut(Schema):
@@ -40,6 +66,15 @@ class MerchantLoginOut(Schema):
     token_type: str
     expires_in: int
     merchant: MerchantOut
+
+
+class MerchantRegisterOut(MerchantLoginOut):
+    need_audit: bool = True
+
+
+class MerchantPasswordChangeIn(Schema):
+    current_password: str
+    new_password: str
 
 
 class PublicMerchantOut(Schema):

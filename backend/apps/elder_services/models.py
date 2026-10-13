@@ -3,7 +3,7 @@ from django.db.models import Q
 
 
 class ElderCareRelation(models.Model):
-    member = models.ForeignKey("members.Member", on_delete=models.CASCADE, related_name="elder_care_relations", verbose_name="小哥")
+    member = models.ForeignKey("members.Member", on_delete=models.CASCADE, related_name="elder_care_relations", verbose_name="帮扶人")
     elder_name = models.CharField("老人称呼", max_length=80)
     elder_address = models.CharField("老人地址", max_length=255)
     frequency = models.CharField("服务频次", max_length=80, blank=True)
@@ -13,8 +13,8 @@ class ElderCareRelation(models.Model):
 
     class Meta:
         db_table = "elder_care_relation"
-        verbose_name = "小哥-老人关系"
-        verbose_name_plural = "小哥-老人关系"
+        verbose_name = "结对帮扶关系"
+        verbose_name_plural = "结对帮扶关系"
         ordering = ("-created_at", "-id")
         constraints = [
             models.UniqueConstraint(

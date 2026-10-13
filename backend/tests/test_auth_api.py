@@ -23,7 +23,6 @@ class AuthApiTests(TestCase):
         self.assertEqual(payload["code"], 0)
         self.assertEqual(payload["data"]["token_type"], "Bearer")
         self.assertEqual(payload["data"]["member"]["openid"], "member-openid")
-        self.assertEqual(payload["data"]["member"]["identity_type"], "normal_user")
         self.assertEqual(payload["data"]["member"]["audit_status"], "none")
         self.assertEqual(payload["data"]["member"]["audit_remark"], "")
         self.assertTrue(Member.objects.filter(openid="member-openid").exists())
@@ -214,7 +213,6 @@ class AuthApiTests(TestCase):
         Member.objects.create(
             openid="member-openid",
             real_name="李建国",
-            identity_type=Member.IdentityType.COURIER,
             audit_status=Member.AuditStatus.APPROVED,
             audit_remark="审核通过",
         )
@@ -225,7 +223,6 @@ class AuthApiTests(TestCase):
         self.assertEqual(response.status_code, 200)
         data = response.json()["data"]
         self.assertEqual(data["real_name"], "李建国")
-        self.assertEqual(data["identity_type"], "courier")
         self.assertEqual(data["audit_status"], "approved")
         self.assertEqual(data["audit_remark"], "审核通过")
 

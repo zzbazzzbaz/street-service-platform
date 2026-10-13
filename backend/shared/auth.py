@@ -23,22 +23,24 @@ class TokenIdentity:
     subject_type: str
     expires_at: int
     openid: str = ""
+    subject_id: int | None = None
     user_id: int | None = None
 
 
-def issue_token(*, subject_type: str, openid: str) -> tuple[str, int]:
+def issue_token(*, subject_type: str, openid: str = "", subject_id: int | None = None) -> tuple[str, int]:
     subject_type = subject_type.strip()
-    openid = openid.strip()
+    openid = (openid or "").strip()
     if subject_type not in {"member", "merchant"}:
         raise TokenError("token 主体类型不支持")
-    if not openid:
-        raise TokenError("openid 不能为空")
+    if not openid and not subject_id:
+        raise TokenError("token 缺少身份")
 
     expires_in = settings.ACCESS_TOKEN_EXPIRES_SECONDS
     now = int(time.time())
     payload = {
         "subject_type": subject_type,
         "openid": openid,
+        "sub_id": int(subject_id) if subject_id else 0,
         "iat": now,
         "exp": now + expires_in,
     }
@@ -68,13 +70,18 @@ def parse_token(token: str) -> TokenIdentity:
         raise
     subject_type = str(payload.get("subject_type") or "").strip()
     openid = str(payload.get("openid") or "").strip()
+    subject_id = payload.get("sub_id") or 0
+    try:
+        subject_id = int(subject_id)
+    except (TypeError, ValueError):
+        subject_id = 0
     user_id = payload.get("user_id")
     expires_at = int(payload.get("exp") or 0)
 
     if subject_type not in {"member", "merchant", "admin"}:
         logger.warning("token 主体类型不支持 subject_type=%s", subject_type)
         raise TokenError("token 主体类型不支持")
-    if subject_type in {"member", "merchant"} and not openid:
+    if subject_type in {"member", "merchant"} and not openid and subject_id <= 0:
         logger.warning("token 缺少身份 subject_type=%s", subject_type)
         raise TokenError("token 缺少身份")
     if subject_type == "admin":
@@ -89,7 +96,13 @@ def parse_token(token: str) -> TokenIdentity:
     if expires_at <= int(time.time()):
         logger.warning("token 已过期 subject_type=%s", subject_type)
         raise TokenError("token 已过期")
-    return TokenIdentity(subject_type=subject_type, openid=openid, user_id=user_id, expires_at=expires_at)
+    return TokenIdentity(
+        subject_type=subject_type,
+        openid=openid,
+        subject_id=subject_id or None,
+        user_id=user_id,
+        expires_at=expires_at,
+    )
 
 
 def get_bearer_token(request) -> str:

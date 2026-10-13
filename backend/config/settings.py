@@ -249,7 +249,7 @@ SIMPLEUI_CONFIG = {
             "icon": "fas fa-users",
             "permission": "members.view_member",
             "models": [
-                {"name": "小哥档案", "icon": "fas fa-user", "url": "/admin/members/member/", "permission": "members.view_member"},
+                {"name": "用户档案", "icon": "fas fa-user", "url": "/admin/members/member/", "permission": "members.view_member"},
             ],
         },
         {
@@ -287,7 +287,7 @@ SIMPLEUI_CONFIG = {
             "permission": "elder_services.view_elderservicetask",
             "models": [
                 {"name": "服务任务", "icon": "fas fa-list-check", "url": "/admin/elder_services/elderservicetask/", "permission": "elder_services.view_elderservicetask"},
-                {"name": "小哥-老人关系", "icon": "fas fa-user-friends", "url": "/admin/elder_services/eldercarerelation/", "permission": "elder_services.view_eldercarerelation"},
+                {"name": "结对帮扶关系", "icon": "fas fa-user-friends", "url": "/admin/elder_services/eldercarerelation/", "permission": "elder_services.view_eldercarerelation"},
                 {"name": "服务反馈", "icon": "fas fa-comment-dots", "url": "/admin/elder_services/elderservicefeedback/", "permission": "elder_services.view_elderservicefeedback"},
             ],
         },

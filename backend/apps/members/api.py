@@ -1,11 +1,24 @@
 from ninja import Router
 from django_ratelimit.decorators import ratelimit
 
-from apps.members.schemas import AuditProfileIn, LoginOut, MemberOut, PasswordLoginIn, ProfileIn, WechatLoginIn, WechatPhoneLoginIn
+from apps.members.schemas import (
+    LoginOut,
+    MemberOut,
+    MemberRegisterIn,
+    MemberRegisterInfoIn,
+    MemberRegisterOut,
+    PasswordChangeIn,
+    PasswordLoginIn,
+    ProfileIn,
+    WechatLoginIn,
+    WechatPhoneLoginIn,
+)
 from apps.members.services import (
+    change_password as member_change_password,
     member_data,
     password_login,
-    submit_audit_profile,
+    register_member,
+    resubmit_register_info,
     test_login,
     update_profile,
     wechat_login_placeholder,
@@ -14,6 +27,7 @@ from apps.members.services import (
 from shared.api import ErrorResponse, SuccessResponse, error_response, success_response
 from shared.auth import TokenError
 from shared.exceptions import BusinessError
+from shared.ratelimit import user_key
 from shared.services import authenticate_member
 
 
@@ -50,6 +64,68 @@ def password_login_view(request, payload: PasswordLoginIn):
         return error_response(exc.code, exc.message, status=exc.status, errors=exc.errors)
 
 
+@auth_router.post("/register", response={200: SuccessResponse[MemberRegisterOut], 400: ErrorResponse})
+@ratelimit(key="ip", rate="5/m", block=True)
+def member_register(request, payload: MemberRegisterIn):
+    try:
+        return success_response(
+            register_member(
+                real_name=payload.real_name,
+                wechat_id=payload.wechat_id,
+                gender=payload.gender,
+                occupation=payload.occupation,
+                address=payload.address,
+                phone=payload.phone,
+                is_party_member=payload.is_party_member,
+                phone_code=payload.phone_code,
+                login_code=payload.login_code,
+            )
+        )
+    except BusinessError as exc:
+        return error_response(exc.code, exc.message, status=exc.status, errors=exc.errors)
+
+
+@router.post("/register-info", response={200: SuccessResponse[MemberOut], 400: ErrorResponse, 401: ErrorResponse, 403: ErrorResponse})
+@ratelimit(key=user_key, rate="5/m", block=True)
+def member_register_info(request, payload: MemberRegisterInfoIn):
+    try:
+        member = authenticate_member(request)
+        return success_response(
+            resubmit_register_info(
+                member,
+                real_name=payload.real_name,
+                wechat_id=payload.wechat_id,
+                gender=payload.gender,
+                occupation=payload.occupation,
+                address=payload.address,
+                is_party_member=payload.is_party_member,
+                phone=payload.phone,
+            )
+        )
+    except TokenError as exc:
+        return error_response(40001, str(exc), status=401)
+    except BusinessError as exc:
+        return error_response(exc.code, exc.message, status=exc.status, errors=exc.errors)
+
+
+@router.post("/password", response={200: SuccessResponse[dict], 400: ErrorResponse, 401: ErrorResponse, 403: ErrorResponse})
+@ratelimit(key=user_key, rate="5/m", block=True)
+def member_password(request, payload: PasswordChangeIn):
+    try:
+        member = authenticate_member(request)
+        return success_response(
+            member_change_password(
+                member,
+                current_password=payload.current_password,
+                new_password=payload.new_password,
+            )
+        )
+    except TokenError as exc:
+        return error_response(40001, str(exc), status=401)
+    except BusinessError as exc:
+        return error_response(exc.code, exc.message, status=exc.status, errors=exc.errors)
+
+
 @router.get("/me", response={200: SuccessResponse[MemberOut], 401: ErrorResponse, 403: ErrorResponse})
 def member_me(request):
     try:
@@ -70,23 +146,6 @@ def member_profile(request, payload: ProfileIn):
                 member,
                 nickname=payload.nickname,
                 phone=payload.phone,
-            )
-        )
-    except TokenError as exc:
-        return error_response(40001, str(exc), status=401)
-    except BusinessError as exc:
-        return error_response(exc.code, exc.message, status=exc.status, errors=exc.errors)
-
-
-@router.post("/audit-profile", response={200: SuccessResponse[MemberOut], 400: ErrorResponse, 401: ErrorResponse, 403: ErrorResponse})
-def member_audit_profile(request, payload: AuditProfileIn):
-    try:
-        member = authenticate_member(request)
-        return success_response(
-            submit_audit_profile(
-                member,
-                real_name=payload.real_name,
-                identity_type=payload.identity_type,
             )
         )
     except TokenError as exc:

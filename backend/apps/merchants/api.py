@@ -7,6 +7,7 @@ from apps.merchants.schemas import (
     MerchantFixedCodeOut,
     MerchantLoginOut,
     MerchantOut,
+    MerchantPasswordChangeIn,
     MerchantPaymentInfoOut,
     MerchantPointCodePreviewOut,
     MerchantPointCodeScanIn,
@@ -16,12 +17,16 @@ from apps.merchants.schemas import (
     MerchantPointPaymentIn,
     MerchantPointPaymentOut,
     MerchantPointRecordsData,
+    MerchantRegisterIn,
+    MerchantRegisterInfoIn,
+    MerchantRegisterOut,
     MerchantSettlementsData,
     MerchantWechatLoginIn,
     MerchantWechatPhoneLoginIn,
     PublicMerchantsData,
 )
 from apps.merchants.services import (
+    change_password as merchant_change_password,
     fixed_code_data,
     merchant_data,
     merchant_payment_info,
@@ -34,6 +39,8 @@ from apps.merchants.services import (
     pay_merchant_with_points,
     point_code_payment_preview,
     public_merchant_data,
+    register_merchant,
+    resubmit_register_info,
     scan_point_code,
     settlement_data,
     test_login,
@@ -46,7 +53,7 @@ from shared.auth import TokenError
 from shared.exceptions import BusinessError
 from shared.pagination import paginate_queryset
 from shared.ratelimit import user_key
-from shared.services import authenticate_member, authenticate_merchant
+from shared.services import authenticate_member, authenticate_merchant_for_audit, require_approved_merchant
 
 
 merchant_auth_router = Router(tags=["商户认证"])
@@ -83,10 +90,30 @@ def merchant_password_login_view(request, payload: MerchantPasswordLoginIn):
         return error_response(exc.code, exc.message, status=exc.status, errors=exc.errors)
 
 
+@merchant_auth_router.post("/register", response={200: SuccessResponse[MerchantRegisterOut], 400: ErrorResponse})
+@ratelimit(key="ip", rate="5/m", block=True)
+def merchant_register(request, payload: MerchantRegisterIn):
+    try:
+        return success_response(
+            register_merchant(
+                shop_name=payload.shop_name,
+                shop_address=payload.shop_address,
+                service_content=payload.service_content,
+                community=payload.community,
+                merchant_nature=payload.merchant_nature,
+                contact_name=payload.contact_name,
+                contact_phone=payload.contact_phone,
+                business_hours=payload.business_hours,
+            )
+        )
+    except BusinessError as exc:
+        return error_response(exc.code, exc.message, status=exc.status, errors=exc.errors)
+
+
 @merchant_router.get("/me", response={200: SuccessResponse[MerchantOut], 401: ErrorResponse, 403: ErrorResponse})
 def merchant_me(request):
     try:
-        merchant = authenticate_merchant(request)
+        merchant = authenticate_merchant_for_audit(request)
     except TokenError as exc:
         return error_response(40001, str(exc), status=401)
     except BusinessError as exc:
@@ -94,10 +121,52 @@ def merchant_me(request):
     return success_response(merchant_data(merchant))
 
 
+@merchant_router.post("/register-info", response={200: SuccessResponse[MerchantOut], 400: ErrorResponse, 401: ErrorResponse, 403: ErrorResponse})
+@ratelimit(key=user_key, rate="5/m", block=True)
+def merchant_register_info(request, payload: MerchantRegisterInfoIn):
+    try:
+        merchant = authenticate_merchant_for_audit(request)
+        return success_response(
+            resubmit_register_info(
+                merchant,
+                shop_name=payload.shop_name,
+                shop_address=payload.shop_address,
+                service_content=payload.service_content,
+                community=payload.community,
+                merchant_nature=payload.merchant_nature,
+                contact_name=payload.contact_name,
+                business_hours=payload.business_hours,
+                contact_phone=payload.contact_phone,
+            )
+        )
+    except TokenError as exc:
+        return error_response(40001, str(exc), status=401)
+    except BusinessError as exc:
+        return error_response(exc.code, exc.message, status=exc.status, errors=exc.errors)
+
+
+@merchant_router.post("/password", response={200: SuccessResponse[dict], 400: ErrorResponse, 401: ErrorResponse, 403: ErrorResponse})
+@ratelimit(key=user_key, rate="5/m", block=True)
+def merchant_password(request, payload: MerchantPasswordChangeIn):
+    try:
+        merchant = authenticate_merchant_for_audit(request)
+        return success_response(
+            merchant_change_password(
+                merchant,
+                current_password=payload.current_password,
+                new_password=payload.new_password,
+            )
+        )
+    except TokenError as exc:
+        return error_response(40001, str(exc), status=401)
+    except BusinessError as exc:
+        return error_response(exc.code, exc.message, status=exc.status, errors=exc.errors)
+
+
 @merchant_router.get("/fixed-code", response={200: SuccessResponse[MerchantFixedCodeOut], 401: ErrorResponse, 403: ErrorResponse})
 def merchant_fixed_code(request):
     try:
-        merchant = authenticate_merchant(request)
+        merchant = require_approved_merchant(request)
     except TokenError as exc:
         return error_response(40001, str(exc), status=401)
     except BusinessError as exc:
@@ -113,7 +182,7 @@ def merchant_point_codes_view(request, include_inactive: bool = False):
     默认仅返回启用中的码；传 include_inactive=true 可同时返回停用的码。
     """
     try:
-        merchant = authenticate_merchant(request)
+        merchant = require_approved_merchant(request)
     except TokenError as exc:
         return error_response(40001, str(exc), status=401)
     except BusinessError as exc:
@@ -125,7 +194,7 @@ def merchant_point_codes_view(request, include_inactive: bool = False):
 @merchant_router.get("/point-records", response={200: SuccessResponse[MerchantPointRecordsData], 400: ErrorResponse, 401: ErrorResponse, 403: ErrorResponse})
 def merchant_point_records(request, page: int = 1, page_size: int = 20, date_from: str = "", date_to: str = "", month: str = ""):
     try:
-        merchant = authenticate_merchant(request)
+        merchant = require_approved_merchant(request)
         queryset = merchant_point_records_queryset(merchant, date_from=date_from, date_to=date_to, month=month)
         summary = merchant_point_records_summary(queryset)
     except TokenError as exc:
@@ -139,7 +208,7 @@ def merchant_point_records(request, page: int = 1, page_size: int = 20, date_fro
 @merchant_router.get("/settlements", response={200: SuccessResponse[MerchantSettlementsData], 401: ErrorResponse, 403: ErrorResponse})
 def merchant_settlements(request, page: int = 1, page_size: int = 20, year: int | None = None, status: str = ""):
     try:
-        merchant = authenticate_merchant(request)
+        merchant = require_approved_merchant(request)
     except TokenError as exc:
         return error_response(40001, str(exc), status=401)
     except BusinessError as exc:
