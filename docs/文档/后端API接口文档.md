@@ -158,12 +158,31 @@ Token 主体分三类，互不通用：
     "member": {
       "id": 1, "openid": "test-openid", "username": null,
       "nickname": "", "phone": "", "real_name": "",
-      "identity_type": "normal_user", "audit_status": "none",
+      "wechat_id": "", "gender": "", "occupation": "",
+      "is_party_member": false, "address": "",
+      "audit_status": "none",
       "audit_remark": "", "audit_submitted_at": null, "is_active": true
     }
   }
 }
 ```
+
+#### 注册提交审核
+
+`POST /api/auth/register`（限流 5/分钟/IP，注册即登录）
+
+| 参数 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| real_name | string | 是 | 姓名，2-10 字 |
+| wechat_id | string | 是 | 微信号，最长 64 字 |
+| gender | string | 是 | `男` / `女` |
+| occupation | string | 是 | 顺丰快递 / 京东快递 / 美团快递 / 达达快递 / 申通快递 / 淘宝闪购 / 中通快递 / 其他 |
+| address | string | 是 | 住址，最长 255 字 |
+| phone | string | 是 | 手机号（同时作为登录名）；传 `phone_code` 时以微信返回号码为准 |
+| is_party_member | boolean | 否 | 是否党员，默认 false |
+| phone_code / login_code | string | 否 | 微信手机号授权 / 登录 code |
+
+响应在 `LoginOut` 基础上增加 `need_audit: true`；账号 `audit_status=pending`、密码初始化为 `000000`，需后台审核通过后才可使用"发布类"功能。
 
 #### 微信手机号登录
 
@@ -176,7 +195,7 @@ Token 主体分三类，互不通用：
 | encrypted_data / iv | string | 否 | 预留 |
 | platform | string | 否 | 默认 `user_mp` |
 
-登录后自动写入手机号，返回 `LoginOut`。
+登录后自动按手机号匹配账号并绑定 openid（已绑定其他微信返回 403），返回 `LoginOut`。
 
 #### 账号密码登录
 
@@ -187,7 +206,7 @@ Token 主体分三类，互不通用：
 | username | string | 是 |
 | password | string | 是 |
 
-错误时统一提示"用户名或密码错误"；停用账号返回 `40301 当前账号已停用`。
+错误时统一提示"用户名或密码错误"；停用账号返回 `40301 当前账号已停用`。审核中/已驳回的用户仍可登录查看审核状态。
 
 ### 3.2 用户信息
 
@@ -195,7 +214,28 @@ Token 主体分三类，互不通用：
 
 `GET /api/members/me`
 
-响应 `MemberOut`（同登录接口中的 `member` 字段）。
+响应 `MemberOut`（同登录接口中的 `member` 字段），用于展示审核状态与驳回原因（`audit_status` / `audit_remark`）。
+
+#### 重新提交注册资料（驳回后重提）
+
+`POST /api/members/register-info`（限流 5/分钟/账号）
+
+| 参数 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| real_name / wechat_id / gender / occupation / address | - | 是 | 同注册表单 |
+| is_party_member | boolean | 否 | 是否党员 |
+| phone | string | 条件 | 仅账号尚未绑定手机号时必填（首次绑定） |
+
+`pending` 返回 400 `资料审核中，请等待审核结果`；`approved` 返回 400 `审核已通过，如需修改资料请联系街道工作人员`。
+
+#### 修改密码
+
+`POST /api/members/password`（限流 5/分钟/账号）
+
+| 参数 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| current_password | string | 是 | 当前密码（注册初始密码 `000000`） |
+| new_password | string | 是 | 至少 6 位，且与当前密码不同 |
 
 #### 更新资料
 
@@ -204,20 +244,11 @@ Token 主体分三类，互不通用：
 | 参数 | 类型 | 必填 | 说明 |
 | --- | --- | --- | --- |
 | nickname | string | 否 | 昵称 |
-| phone | string | 否 | 手机号 |
+| phone | string | 否 | 手机号（与他人重复返回 400 `该手机号已被其他账号使用`，改手机号同步登录名） |
 
-#### 提交实名审核
+> 原「提交实名审核」接口 `POST /api/members/audit-profile` 与小哥身份已废弃，改为注册/重提审核流程（2026-10-13）。
 
-`POST /api/members/audit-profile`
-
-| 参数 | 类型 | 必填 | 说明 |
-| --- | --- | --- | --- |
-| real_name | string | 是 | 真实姓名 |
-| identity_type | string | 是 | `normal_user` 或 `courier` |
-
-提交后 `audit_status` 变为 `pending`；已审核通过的用户不可再提交。
-
-> 注意：随手拍、社情民意、问题反馈、助老反馈等"发布类"接口要求用户已审核通过（`approved`），否则返回 `40301 当前用户资料未审核通过`。
+> 注意：随手拍、社情民意、问题反馈、助老服务等"发布类"接口要求用户已审核通过（`approved`），否则返回 `40301 当前用户资料未审核通过`；学习、积分、活动、商户消费等基础功能不受限。
 
 ### 3.3 学习宣传
 
@@ -384,9 +415,9 @@ Token 主体分三类，互不通用：
 
 #### 我的对口关系
 
-`GET /api/elder-services/my-relation`（需审核通过且为小哥）
+`GET /api/elder-services/my-relation`（需审核通过；所有审核通过用户均可参与助老服务）
 
-返回当前小哥的有效老人关系，无则为 `null`。
+返回当前用户（帮扶人）的有效老人关系，无则为 `null`。
 
 #### 任务广场
 
@@ -396,7 +427,7 @@ Token 主体分三类，互不通用：
 
 `GET /api/elder-services/my-tasks?page=&page_size=&feedback_status=`
 
-返回与我（小哥）对口关系关联的已发布任务，附最新反馈状态。`feedback_status`：`none`（未反馈）/ `pending` / `approved` / `rejected`。
+返回与我（结对帮扶人）对口关系关联的已发布任务，附最新反馈状态。`feedback_status`：`none`（未反馈）/ `pending` / `approved` / `rejected`。
 
 #### 任务详情
 
@@ -575,7 +606,27 @@ Token 主体分三类，互不通用：
 | --- | --- |
 | `POST /api/merchant/auth/wechat-login` | 微信登录（测试传 `openid`；正式传 `code`，当前未接入） |
 | `POST /api/merchant/auth/wechat-phone-login` | 手机号授权登录（`login_code` + `phone_code`，`platform=merchant_mp`；按手机号匹配商户并绑定 openid） |
-| `POST /api/merchant/auth/login` | 账号密码登录（`username` + `password`） |
+| `POST /api/merchant/auth/login` | 账号密码登录（`username` + `password`），登录名 = 联系电话，注册初始密码 `000000` |
+| `POST /api/merchant/auth/register` | **注册提交审核**（公开，限流 5/分钟/IP），字段见下 |
+
+#### 注册提交审核
+
+`POST /api/merchant/auth/register`
+
+| 参数 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| shop_name | string | 是 | 店铺名称，最长 100 字 |
+| shop_address | string | 是 | 店铺地址，最长 255 字 |
+| service_content | string | 是 | 服务内容，最长 500 字 |
+| community | string | 是 | 所属社区，最长 100 字 |
+| merchant_nature | string | 是 | 商户性质，最长 100 字 |
+| contact_name | string | 是 | 联系人，最长 50 字 |
+| contact_phone | string | 是 | 联系电话（= 登录名），11 位手机号 |
+| business_hours | string | 是 | `HH:MM-HH:MM`，结束须晚于开始 |
+
+注册即登录（响应含 `need_audit: true` 与 `access_token`），账号 `audit_status=pending`、`is_active=false`：可登录查看审核状态、被驳回后重提、修改密码；工作台接口在审核通过前返回 `40301 商户资料审核中，请等待审核`。
+
+登录放行规则：`pending` / `rejected` 允许登录（仅状态页）；`approved` 且未停用正常登录；已通过但被后台停用返回 `40301 当前账号已停用`。
 
 响应结构同用户端（`merchant` 替换 `member`）：
 
@@ -584,17 +635,25 @@ Token 主体分三类，互不通用：
   "code": 0, "message": "success",
   "data": {
     "access_token": "eyJ...", "token_type": "Bearer", "expires_in": 7200,
-    "merchant": { "id": 1, "openid": "...", "username": null, "name": "xx店",
-      "contact_name": "", "phone": "", "address": "", "latitude": null,
-      "longitude": null, "category_code": "food", "business_hours": "",
-      "service_content": "", "is_active": true }
+    "need_audit": true,
+    "merchant": { "id": 1, "openid": "", "username": "13712345678", "name": "xx店",
+      "contact_name": "王店长", "phone": "13712345678", "address": "", "community": "幸福社区",
+      "merchant_nature": "个体工商户", "latitude": null,
+      "longitude": null, "category_code": "other", "business_hours": "",
+      "service_content": "", "audit_status": "pending", "audit_remark": "", "is_active": false }
   }
 }
 ```
 
-### 4.2 商户信息
+### 4.2 商户信息与审核资料
 
-`GET /api/merchant/me`
+| 接口 | 说明 |
+| --- | --- |
+| `GET /api/merchant/me` | 当前商户信息（含 `audit_status / audit_remark`，审核中/已驳回也可访问） |
+| `POST /api/merchant/register-info` | **驳回后重新提交资料**（同注册 8 字段，联系电话不可改；`pending` 报 400 `资料审核中，请等待审核结果`，`approved` 报 400 `审核已通过，如需修改资料请联系街道工作人员`） |
+| `POST /api/merchant/password` | 修改密码（`current_password` / `new_password`，规则同用户端） |
+
+以下工作台接口需审核通过（`approved`）且账号启用：`/api/merchant/fixed-code`、`/api/merchant/point-codes`、`/api/merchant/point-records`、`/api/merchant/settlements`。
 
 ### 4.3 固定码（旧，单码）
 
@@ -688,7 +747,7 @@ Token 主体分三类，互不通用：
 
 `GET /api/admin/enums`
 
-返回全部下拉选项，键为：`member_identity_types`、`member_audit_statuses`、`learning_content_types`、`report_category_codes`、`report_statuses`、`civic_feedback_statuses`、`problem_feedback_statuses`、`activity_statuses`、`activity_types`、`activity_checkin_statuses`、`elder_task_statuses`、`elder_feedback_statuses`、`point_change_types`、`point_source_types`、`merchant_settlement_period_types`、`merchant_settlement_statuses`、`merchant_category_codes`。
+返回全部下拉选项，键为：`member_audit_statuses`、`member_genders`、`member_occupations`、`learning_content_types`、`report_category_codes`、`report_statuses`、`civic_feedback_statuses`、`problem_feedback_statuses`、`activity_statuses`、`activity_types`、`activity_checkin_statuses`、`elder_task_statuses`、`elder_feedback_statuses`、`point_change_types`、`point_source_types`、`merchant_settlement_period_types`、`merchant_settlement_statuses`、`merchant_category_codes`、`merchant_audit_statuses`。
 
 #### 工作台汇总
 
@@ -698,7 +757,7 @@ Token 主体分三类，互不通用：
 {
   "code": 0, "message": "success",
   "data": {
-    "pending_member_audits": 3, "pending_reports": 5,
+    "pending_member_audits": 3, "pending_merchant_audits": 2, "pending_reports": 5,
     "pending_civic_feedbacks": 2, "pending_problem_feedbacks": 1,
     "pending_activity_checkins": 4, "pending_elder_service_feedbacks": 2,
     "today_merchant_payment_count": 8, "today_merchant_payment_points": 160,
@@ -722,11 +781,11 @@ Token 主体分三类，互不通用：
 
 | 接口 | 说明 |
 | --- | --- |
-| `GET /api/admin/members?keyword=&identity_type=&audit_status=&is_active=&page=&page_size=` | 列表（keyword 匹配昵称/姓名/手机号） |
+| `GET /api/admin/members?keyword=&audit_status=&is_active=&page=&page_size=` | 列表（keyword 匹配昵称/姓名/手机号/微信号/住址） |
 | `GET /api/admin/members/{member_id}` | 详情（含完整手机号） |
-| `PATCH /api/admin/members/{member_id}` | 修改（nickname/phone/real_name/identity_type） |
+| `PATCH /api/admin/members/{member_id}` | 修改（nickname/phone/real_name/wechat_id/gender/occupation/is_party_member/address） |
 | `POST /api/admin/members/{member_id}/status` | 启用/停用 `{ "is_active": bool }` |
-| `POST /api/admin/members/{member_id}/audit` | 实名审核 `{ "action": "approve"|"reject", "remark": "" }` |
+| `POST /api/admin/members/{member_id}/audit` | 注册审核 `{ "action": "approve"|"reject", "remark": "" }`（reject 必填 remark，即用户端展示的驳回原因） |
 | `GET /api/admin/members/{member_id}/points` | 积分账户与流水 |
 
 ### 5.5 学习管理
@@ -841,11 +900,12 @@ Token 主体分三类，互不通用：
 
 | 接口 | 说明 |
 | --- | --- |
-| `GET /api/admin/merchants?keyword=&is_active=&page=&page_size=` | 列表 |
-| `POST /api/admin/merchants` | 创建（openid/username/password/name/contact_name/phone/address/坐标/category_code/business_hours/service_content/is_active） |
+| `GET /api/admin/merchants?keyword=&is_active=&audit_status=&page=&page_size=` | 列表（keyword 匹配名称/联系人/手机号/openid/用户名/所属社区；`audit_status` 为新增筛选） |
+| `POST /api/admin/merchants` | 创建（openid/username/password/name/contact_name/phone/address/community/merchant_nature/坐标/category_code/business_hours/service_content/is_active）；后台自建商户直接 `audit_status=approved` |
 | `GET /api/admin/merchants/{merchant_id}` | 详情 |
-| `PATCH /api/admin/merchants/{merchant_id}` | 修改 |
+| `PATCH /api/admin/merchants/{merchant_id}` | 修改（支持 community/merchant_nature；手机号撞号返回 400） |
 | `DELETE /api/admin/merchants/{merchant_id}` | 删除 |
+| `POST /api/admin/merchants/{merchant_id}/audit` | **审核** `{ "action": "approve"\|"reject", "remark": "" }`；`approve` → `approved` + 启用，`reject` 必须带 `remark`（驳回原因）→ `rejected` + 停用 |
 | `POST /api/admin/merchants/{merchant_id}/status` | 启用/停用 `{ "is_active": bool }` |
 | `POST /api/admin/merchants/{merchant_id}/password` | 重置密码 |
 | `GET /api/admin/merchants/{merchant_id}/fixed-code` | 商户固定码（旧） |
@@ -868,8 +928,10 @@ Token 主体分三类，互不通用：
 
 | 枚举 | 取值 |
 | --- | --- |
-| 用户身份 | `normal_user` / `courier` |
 | 用户审核 | `none` / `pending` / `approved` / `rejected` |
+| 用户性别 | `男` / `女` |
+| 用户职业 | `顺丰快递` / `京东快递` / `美团快递` / `达达快递` / `申通快递` / `淘宝闪购` / `中通快递` / `其他` |
+| 商户审核 | `none` / `pending` / `approved` / `rejected` |
 | 学习类型 | `article` / `image` / `video` |
 | 随手拍分类 | `safety_hazard` / `environmental_hygiene` / `public_facility` / `other` / `good_deed` |
 | 随手拍状态 | `pending` / `approved` / `rejected` |

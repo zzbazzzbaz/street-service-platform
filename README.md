@@ -115,31 +115,38 @@ POST /api/auth/wechat-login
 POST /api/merchant/auth/wechat-login
 ```
 
+> 2026-10-13 起用户端/商户端支持注册提交审核：
+> - 用户端注册 `POST /api/auth/register`（姓名/微信号/性别/手机号/职业/是否党员/住址），商户端注册 `POST /api/merchant/auth/register`（店铺名称/地址/服务内容/所属社区/商户性质/联系人/联系电话/营业时间）；
+> - 注册即登录，账号密码登录名 = 手机号，初始密码统一 `000000`，可在小程序内自助改密；
+> - 注册后 `audit_status=pending`，后台审核通过（`approved`）才是可用账户；被驳回后可在小程序内重新提交资料；
+> - 详情见 `docs/API接口文档/15-10.13注册审核流程接口变动.md`。
+
 种子数据会创建学习内容、积分余额、活动报名和签到、助老反馈、随手拍上报、商户、积分兑换比例和商户积分支付流水，方便前端联调完整流程。
 
 ## 核心业务流程
 
 用户端：
 
-1. 使用 `POST /api/auth/wechat-login` 获取用户 token。
-2. 查看学习内容并完成学习获取积分。
+1. 注册提交审核 `POST /api/auth/register`（或使用 `POST /api/auth/wechat-login` 获取用户 token）。
+2. 审核通过前可使用学习、积分、活动、商户消费等基础功能；随手拍、反馈、助老服务需 `approved`。
 3. 提交随手拍、报名活动、扫码签到、提交助老服务反馈。
 4. 查看积分余额和流水。
 5. 扫商户固定码后使用积分支付。
 
 商户端：
 
-1. 使用 `POST /api/merchant/auth/wechat-login` 获取商户 token。
-2. 调用 `GET /api/merchant/fixed-code` 获取固定码内容。
+1. 注册提交审核 `POST /api/merchant/auth/register`，或使用 `POST /api/merchant/auth/wechat-login` 获取商户 token。
+2. 审核通过后调用 `GET /api/merchant/fixed-code` 获取固定码内容。
 3. 调用 `GET /api/merchant/point-records` 查看本商户积分支付流水。
 
 后台：
 
 1. 调用 `POST /api/admin/auth/login` 获取后台管理员 token。
-2. 通过 `/api/admin/admin-users`、`/api/admin/members` 管理后台账号、用户资料和用户审核。
-3. 通过 `/api/admin/learning/*`、`/api/admin/activities/*`、`/api/admin/elder-services/*` 维护内容、活动和助老服务。
-4. 通过 `/api/admin/reports`、`/api/admin/civic-feedbacks`、`/api/admin/problem-feedbacks` 完成审核和回复。
-5. 通过 `/api/admin/points/*`、`/api/admin/merchants/*` 完成积分、人工加分、兑换比例、商户和结算管理。
+2. 通过 `/api/admin/admin-users`、`/api/admin/members` 管理后台账号、用户资料和用户注册审核。
+3. 通过 `/api/admin/merchants` 和 `POST /api/admin/merchants/{id}/audit` 完成商户注册审核。
+4. 通过 `/api/admin/learning/*`、`/api/admin/activities/*`、`/api/admin/elder-services/*` 维护内容、活动和助老服务。
+5. 通过 `/api/admin/reports`、`/api/admin/civic-feedbacks`、`/api/admin/problem-feedbacks` 完成审核和回复。
+6. 通过 `/api/admin/points/*`、`/api/admin/merchants/*` 完成积分、人工加分、兑换比例、商户和结算管理。
 
 Django Admin 仍保留作为开发调试和应急排查入口，不作为正式运营后台。
 
