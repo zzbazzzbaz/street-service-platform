@@ -9,12 +9,10 @@ from django.utils import timezone
 from apps.members.models import Member
 from shared.auth import issue_token
 from shared.exceptions import BusinessError
+from shared.passwords import INITIAL_PASSWORD, is_initial_password
 from shared.validators import clean_phone
 from shared.wechat import code_to_openid as wechat_code_to_openid
 from shared.wechat import phone_code_to_phone as wechat_phone_code_to_phone
-
-
-INITIAL_PASSWORD = "000000"
 
 
 def member_data(member: Member) -> dict:
@@ -37,7 +35,7 @@ def member_data(member: Member) -> dict:
     }
 
 
-def _login_payload(member: Member) -> dict:
+def _login_payload(member: Member, *, must_change_password: bool = False) -> dict:
     token, expires_in = issue_token(
         subject_type="member",
         openid=member.openid or "",
@@ -47,6 +45,7 @@ def _login_payload(member: Member) -> dict:
         "access_token": token,
         "token_type": "Bearer",
         "expires_in": expires_in,
+        "must_change_password": must_change_password,
         "member": member_data(member),
     }
 
@@ -79,7 +78,8 @@ def password_login(username: str, password: str) -> dict:
         raise BusinessError("用户名或密码错误", code=40000, status=400)
     if not member.is_active:
         raise BusinessError("当前账号已停用", code=40301, status=403)
-    return _login_payload(member)
+    # 用「提交的密码是否就是初始密码」代替 must_change_password 标志位：零额外开销，改密后自然消失
+    return _login_payload(member, must_change_password=is_initial_password(password))
 
 
 def _clean_real_name(value: str) -> str:

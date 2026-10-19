@@ -38,6 +38,7 @@ from apps.service_locations.services import service_location_data
 from shared.auth import issue_admin_token
 from shared.exceptions import BusinessError
 from shared.media import media_url
+from shared.passwords import is_initial_password
 from shared.pagination import paginate_queryset
 from shared.privacy import admin_member_brief
 
@@ -78,6 +79,7 @@ def login_admin(username: str, password: str) -> dict:
         "access_token": token,
         "token_type": "Bearer",
         "expires_in": expires_in,
+        "must_change_password": is_initial_password(password),
         "admin": admin_user_data(user),
     }
 
@@ -162,8 +164,8 @@ def create_admin_user(payload) -> dict:
         raise BusinessError("username 不能为空")
     if User.objects.filter(username=username).exists():
         raise BusinessError("username 已存在")
-    if len(payload.password) < 8:
-        raise BusinessError("密码长度至少 8 位")
+    if len(payload.password) < 6:
+        raise BusinessError("密码长度至少 6 位")
     user = User.objects.create_user(
         username=username,
         password=payload.password,
@@ -202,8 +204,8 @@ def set_admin_user_status(user_id: int, *, is_active: bool, current_admin) -> di
 
 def reset_admin_user_password(user_id: int, *, password: str) -> dict:
     user = get_or_404(User, user_id)
-    if len(password) < 8:
-        raise BusinessError("密码长度至少 8 位")
+    if len(password) < 6:
+        raise BusinessError("密码长度至少 6 位")
     user.set_password(password)
     user.save(update_fields=["password"])
     return {"id": user.id, "password_reset": True}
@@ -1004,8 +1006,8 @@ def create_merchant(payload) -> Merchant:
     password = (getattr(payload, "password", "") or "").strip()
     if username and not password:
         raise BusinessError("设置用户名时必须同时设置密码")
-    if password and len(password) < 8:
-        raise BusinessError("密码长度至少 8 位")
+    if password and len(password) < 6:
+        raise BusinessError("密码长度至少 6 位")
     validate_coordinates(payload.latitude, payload.longitude)
     category_code = validate_merchant_category(payload.category_code)
     return Merchant.objects.create(
@@ -1061,8 +1063,8 @@ def update_merchant(merchant_id: int, payload) -> Merchant:
 def reset_merchant_password(merchant_id: int, *, password: str) -> dict:
     merchant = get_or_404(Merchant, merchant_id)
     password = (password or "").strip()
-    if len(password) < 8:
-        raise BusinessError("密码长度至少 8 位")
+    if len(password) < 6:
+        raise BusinessError("密码长度至少 6 位")
     if not merchant.username:
         raise BusinessError("该商户未设置用户名，无法重置密码")
     merchant.password = make_password(password)

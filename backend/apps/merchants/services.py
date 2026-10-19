@@ -17,6 +17,7 @@ from apps.points.models import PointExchangeRule, PointRecord
 from apps.points.services import deduct_points, get_or_create_account
 from shared.auth import issue_token
 from shared.exceptions import BusinessError
+from shared.passwords import INITIAL_PASSWORD, is_initial_password
 from shared.privacy import mask_name, mask_phone
 from shared.validators import clean_phone
 from shared.wechat import code_to_openid as wechat_code_to_openid
@@ -24,7 +25,6 @@ from shared.wechat import phone_code_to_phone as wechat_phone_code_to_phone
 
 logger = logging.getLogger("street.merchants")
 
-INITIAL_PASSWORD = "000000"
 BUSINESS_HOURS_PATTERN = re.compile(r"^([01]\d|2[0-3]):([0-5]\d)-([01]\d|2[0-3]):([0-5]\d)$")
 
 
@@ -66,7 +66,7 @@ def public_merchant_data(merchant: Merchant) -> dict:
     }
 
 
-def _login_payload(merchant: Merchant) -> dict:
+def _login_payload(merchant: Merchant, *, must_change_password: bool = False) -> dict:
     token, expires_in = issue_token(
         subject_type="merchant",
         openid=merchant.openid or "",
@@ -76,6 +76,7 @@ def _login_payload(merchant: Merchant) -> dict:
         "access_token": token,
         "token_type": "Bearer",
         "expires_in": expires_in,
+        "must_change_password": must_change_password,
         "merchant": merchant_data(merchant),
     }
 
@@ -110,7 +111,7 @@ def password_login(username: str, password: str) -> dict:
     if not check_password(password, merchant.password):
         raise BusinessError("用户名或密码错误", code=40000, status=400)
     _ensure_login_allowed(merchant)
-    return _login_payload(merchant)
+    return _login_payload(merchant, must_change_password=is_initial_password(password))
 
 
 def _clean_registration_business_hours(value: str) -> str:

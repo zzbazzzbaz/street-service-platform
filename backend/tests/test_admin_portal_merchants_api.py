@@ -216,4 +216,4 @@ class AdminPortalMerchantAccountTests(TestCase):
             **self.headers,
         )
         self.assertEqual(response.status_code, 400)
-        self.assertIn("至少 8 位", response.json()["message"])
+        self.assertIn("至少 6 位", response.json()["message"])

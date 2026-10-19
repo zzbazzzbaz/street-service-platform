@@ -1,3 +1,6 @@
+from urllib.parse import quote
+
+from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
 from ninja import Form, Router
 
@@ -25,6 +28,7 @@ from apps.admin_portal.schemas import (
     ExchangeRuleIn,
     ExchangeRuleStatusIn,
     GenericStatusIn,
+    ImportResultOut,
     LearningContentIn,
     LearningContentStatusIn,
     LearningContentUpdateIn,
@@ -54,6 +58,7 @@ from apps.admin_portal.schemas import (
     StatusIn,
     VisibilityReviewIn,
 )
+from apps.admin_portal import importers
 from apps.admin_portal import services as svc
 from django_ratelimit.decorators import ratelimit
 from apps.civic_feedbacks.models import CivicFeedback
@@ -1171,5 +1176,89 @@ def admin_merchant_delete(request, merchant_id: int):
     try:
         _admin_or_error(request)
         return success_response(svc.delete_merchant(merchant_id))
+    except BusinessError as exc:
+        return _business_error(exc)
+
+
+# 账号 Excel 导入（Vue 管理端使用；模板下载 + 一步式上传校验落库）
+
+
+XLSX_CONTENT_TYPE = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+
+
+def _xlsx_download(content: bytes, filename: str) -> HttpResponse:
+    response = HttpResponse(content, content_type=XLSX_CONTENT_TYPE)
+    response["Content-Disposition"] = f"attachment; filename*=UTF-8''{quote(filename)}"
+    response["Cache-Control"] = "no-store"
+    return response
+
+
+def _uploaded_import_file(request):
+    for field in ("file", "files", "files[]"):
+        uploaded = request.FILES.get(field)
+        if uploaded is not None:
+            return uploaded
+    raise BusinessError(
+        "请选择要上传的 .xlsx 文件",
+        errors=[{"row": 1, "column": "文件", "value": "", "message": "请求里没有找到上传文件（表单字段名用 file）"}],
+    )
+
+
+@router.get("/imports/members/template", tags=["后台管理-账号导入"])
+def admin_member_import_template(request):
+    """下载会员导入模板（.xlsx）。"""
+    try:
+        _admin_or_error(request)
+    except BusinessError as exc:
+        return _business_error(exc)
+    return _xlsx_download(importers.member_import_template(), "会员导入模板.xlsx")
+
+
+@router.post("/imports/members", response={200: SuccessResponse[ImportResultOut], 400: ErrorResponse, 401: ErrorResponse, 403: ErrorResponse})
+def admin_import_members(request):
+    """上传会员 Excel，整批校验通过才落库；有任何问题整批驳回。"""
+    try:
+        _admin_or_error(request)
+        return success_response(importers.import_members(_uploaded_import_file(request)))
+    except BusinessError as exc:
+        return _business_error(exc)
+
+
+@router.get("/imports/merchants/template", tags=["后台管理-账号导入"])
+def admin_merchant_import_template(request):
+    """下载商户导入模板（.xlsx）。"""
+    try:
+        _admin_or_error(request)
+    except BusinessError as exc:
+        return _business_error(exc)
+    return _xlsx_download(importers.merchant_import_template(), "商户导入模板.xlsx")
+
+
+@router.post("/imports/merchants", response={200: SuccessResponse[ImportResultOut], 400: ErrorResponse, 401: ErrorResponse, 403: ErrorResponse})
+def admin_import_merchants(request):
+    """上传商户 Excel，整批校验通过才落库；有任何问题整批驳回。"""
+    try:
+        _admin_or_error(request)
+        return success_response(importers.import_merchants(_uploaded_import_file(request)))
+    except BusinessError as exc:
+        return _business_error(exc)
+
+
+@router.get("/imports/admin-users/template", tags=["后台管理-账号导入"])
+def admin_user_import_template(request):
+    """下载后台账号导入模板（.xlsx）。"""
+    try:
+        _admin_or_error(request)
+    except BusinessError as exc:
+        return _business_error(exc)
+    return _xlsx_download(importers.admin_user_import_template(), "后台账号导入模板.xlsx")
+
+
+@router.post("/imports/admin-users", response={200: SuccessResponse[ImportResultOut], 400: ErrorResponse, 401: ErrorResponse, 403: ErrorResponse})
+def admin_import_admin_users(request):
+    """上传后台账号 Excel，整批校验通过才落库；有任何问题整批驳回。"""
+    try:
+        _admin_or_error(request)
+        return success_response(importers.import_admin_users(_uploaded_import_file(request)))
     except BusinessError as exc:
         return _business_error(exc)

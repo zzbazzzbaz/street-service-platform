@@ -155,6 +155,7 @@ Token 主体分三类，互不通用：
     "access_token": "eyJ...",
     "token_type": "Bearer",
     "expires_in": 7200,
+    "must_change_password": false,
     "member": {
       "id": 1, "openid": "test-openid", "username": null,
       "nickname": "", "phone": "", "real_name": "",
@@ -635,6 +636,7 @@ Token 主体分三类，互不通用：
   "code": 0, "message": "success",
   "data": {
     "access_token": "eyJ...", "token_type": "Bearer", "expires_in": 7200,
+    "must_change_password": false,
     "need_audit": true,
     "merchant": { "id": 1, "openid": "", "username": "13712345678", "name": "xx店",
       "contact_name": "王店长", "phone": "13712345678", "address": "", "community": "幸福社区",
@@ -730,12 +732,15 @@ Token 主体分三类，互不通用：
   "code": 0, "message": "success",
   "data": {
     "access_token": "eyJ...", "token_type": "Bearer", "expires_in": 7200,
+    "must_change_password": false,
     "admin": { "id": 1, "username": "admin", "email": "", "first_name": "",
       "last_name": "", "is_active": true, "is_staff": true,
       "is_backend_manager": true, "is_superuser": true, "last_login": null }
   }
 }
 ```
+
+> 三端（用户端 / 商户端 / 后台）登录响应都有一个 `must_change_password` 字段：本次提交的密码仍然是初始密码 `000000` 时为 `true`，前端应引导用户跳转改密；改密后该字段自动变回 `false`。它不阻断其他接口（软拦截）。详见 `16-10.19账号Excel导入与强制改密.md`。
 
 #### 当前管理员信息
 
@@ -923,6 +928,42 @@ Token 主体分三类，互不通用：
 | `GET /api/admin/merchants/settlements/{settlement_id}` | 结算单详情 |
 | `PATCH /api/admin/merchants/settlements/{settlement_id}` | 修改 |
 | `POST /api/admin/merchants/settlements/{settlement_id}/process` | 标记已处理 `{ "processor_name": "", "remark": "" }` |
+
+### 5.14 账号 Excel 导入
+
+批量初始化账号。**整批拒绝**：只要有一条不合格，一行都不写库，返回逐行错误清单；**不需要 migration**。详细字段与前端对接说明见 `16-10.19账号Excel导入与强制改密.md`。
+
+| 接口 | 说明 |
+| --- | --- |
+| `GET /api/admin/imports/members/template` | 下载会员导入模板（xlsx 二进制） |
+| `POST /api/admin/imports/members` | 导入会员，`multipart/form-data`，文件字段名 `file` |
+| `GET /api/admin/imports/merchants/template` | 下载商户导入模板 |
+| `POST /api/admin/imports/merchants` | 导入商户 |
+| `GET /api/admin/imports/admin-users/template` | 下载后台账号导入模板 |
+| `POST /api/admin/imports/admin-users` | 导入后台账号 |
+
+文件限制：仅 `.xlsx`、≤2MB、≤500 行数据；按列名匹配表头，不看列顺序（多余列忽略，缺必填列整包报错）。
+
+成功响应：
+
+```json
+{ "code": 0, "message": "success", "data": { "imported": 216, "message": "导入成功，共新增 216 个会员" } }
+```
+
+失败响应（HTTP 400）：`errors` 是**数组**，`row` 是 Excel 实际行号（表头 = 第 1 行）：
+
+```json
+{
+  "code": 40000,
+  "message": "校验未通过，共 2 处问题，已全部驳回，未写入任何会员",
+  "errors": [
+    { "row": 3, "column": "手机号", "value": "13800138000", "message": "该手机号已存在（会员「张三」，已通过，2026-08-12 注册）" },
+    { "row": 7, "column": "性别", "value": "未知", "message": "性别只能填 男 或 女" }
+  ]
+}
+```
+
+导入结果：会员 / 商户一律 `audit_status=approved`、`is_active=true`，初始密码 `000000`；后台账号 `is_backend_manager=true`、`is_staff=true`。冲突键为手机号（会员 / 商户）与登录用户名（商户 / 后台账号）。
 
 ## 6. 附录：枚举取值
 

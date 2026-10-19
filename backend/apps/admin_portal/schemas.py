@@ -25,6 +25,7 @@ class AdminLoginOut(Schema):
     access_token: str
     token_type: str
     expires_in: int
+    must_change_password: bool = False
     admin: AdminUserOut
 
 
@@ -391,3 +392,15 @@ class MerchantPointCodeUpdateIn(Schema):
     points: int | None = None
     remark: str | None = None
     is_active: bool | None = None
+
+
+class ImportIssueOut(Schema):
+    row: int
+    column: str
+    value: str = ""
+    message: str
+
+
+class ImportResultOut(Schema):
+    imported: int
+    message: str
