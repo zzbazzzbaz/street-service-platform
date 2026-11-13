@@ -93,7 +93,12 @@ class AdminPortalMerchantsApiTests(TestCase):
         self.assertEqual(process_response.json()["data"]["status"], "processed")
         self.assertEqual(refresh_processed.status_code, 400)
         self.assertIn("已处理", refresh_processed.json()["message"])
-        self.assertEqual(delete_response.status_code, 400)
+        self.assertEqual(delete_response.status_code, 200)
+        self.assertTrue(delete_response.json()["data"]["deleted"])
+        merchant = Merchant.objects.get(pk=merchant_id)
+        self.assertIsNotNone(merchant.deleted_at)
+        self.assertTrue(PointRecord.objects.filter(merchant_id=merchant_id).exists())
+        self.assertTrue(MerchantSettlement.objects.filter(merchant_id=merchant_id).exists())
 
     def test_merchant_openid_must_be_unique(self):
         Merchant.objects.create(openid="dup-openid", name="已有商户")
@@ -217,3 +222,53 @@ class AdminPortalMerchantAccountTests(TestCase):
         )
         self.assertEqual(response.status_code, 400)
         self.assertIn("至少 6 位", response.json()["message"])
+
+    def test_merchant_soft_delete_archives_identity_and_hides_from_list(self):
+        merchant = Merchant.objects.create(
+            openid="merchant-openid",
+            username="13900000999",
+            password=make_password("000000"),
+            name="待删除商户",
+            phone="13900000999",
+            audit_status=Merchant.AuditStatus.APPROVED,
+            is_active=True,
+        )
+
+        response = self.client.delete(f"/api/admin/merchants/{merchant.id}?reason=停止合作", **self.headers)
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.json()["data"]["deleted"])
+
+        merchant.refresh_from_db()
+        self.assertIsNotNone(merchant.deleted_at)
+        self.assertFalse(merchant.is_active)
+        self.assertEqual(merchant.deleted_username, "13900000999")
+        self.assertEqual(merchant.deleted_phone, "13900000999")
+        self.assertEqual(merchant.deleted_by_id, self.admin.id)
+        self.assertEqual(merchant.delete_reason, "停止合作")
+        self.assertEqual(merchant.username, f"deleted_{merchant.id}")
+        self.assertEqual(merchant.phone, f"deleted_{merchant.id}")
+
+        list_response = self.client.get("/api/admin/merchants?keyword=待删除商户", **self.headers)
+        self.assertEqual(list_response.json()["data"]["total"], 0)
+
+        # 原账号无法再登录
+        login_response = self.client.post(
+            "/api/merchant/auth/login",
+            {"username": "13900000999", "password": "000000"},
+            content_type="application/json",
+        )
+        self.assertEqual(login_response.status_code, 400)
+
+        # 原手机号可以重新建档
+        again = self.client.post(
+            "/api/admin/merchants",
+            {"name": "新商户", "phone": "13900000999", "username": "13900000999", "password": "000000"},
+            content_type="application/json",
+            **self.headers,
+        )
+        self.assertEqual(again.status_code, 200)
+
+        # 重复删除返回错误
+        repeat = self.client.delete(f"/api/admin/merchants/{merchant.id}", **self.headers)
+        self.assertEqual(repeat.status_code, 400)
+        self.assertIn("已删除", repeat.json()["message"])

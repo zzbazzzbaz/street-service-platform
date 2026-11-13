@@ -32,6 +32,9 @@ def member_data(member: Member) -> dict:
         "audit_remark": member.audit_remark,
         "audit_submitted_at": member.audit_submitted_at,
         "is_active": member.is_active,
+        "is_deleted": member.deleted_at is not None,
+        "deleted_at": member.deleted_at,
+        "delete_reason": member.delete_reason,
     }
 
 
@@ -71,7 +74,7 @@ def password_login(username: str, password: str) -> dict:
     username = username.strip()
     if not username or not password:
         raise BusinessError("用户名或密码错误", code=40000, status=400)
-    member = Member.objects.filter(username=username).first()
+    member = Member.objects.filter(username=username, deleted_at__isnull=True).first()
     if member is None or not member.password:
         raise BusinessError("用户名或密码错误", code=40000, status=400)
     if not check_password(password, member.password):

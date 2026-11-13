@@ -47,6 +47,9 @@ def merchant_data(merchant: Merchant) -> dict:
         "audit_status": merchant.audit_status,
         "audit_remark": merchant.audit_remark,
         "is_active": merchant.is_active,
+        "is_deleted": merchant.deleted_at is not None,
+        "deleted_at": merchant.deleted_at,
+        "delete_reason": merchant.delete_reason,
     }
 
 
@@ -105,7 +108,7 @@ def password_login(username: str, password: str) -> dict:
     username = (username or "").strip()
     if not username or not password:
         raise BusinessError("用户名或密码错误", code=40000, status=400)
-    merchant = Merchant.objects.filter(username=username).first()
+    merchant = Merchant.objects.filter(username=username, deleted_at__isnull=True).first()
     if merchant is None or not merchant.password:
         raise BusinessError("用户名或密码错误", code=40000, status=400)
     if not check_password(password, merchant.password):
@@ -396,11 +399,13 @@ def payment_record_data(record: PointRecord) -> dict:
 
 def merchant_point_record_data(record: PointRecord) -> dict:
     data = payment_record_data(record)
+    member = record.member
+    phone = member.deleted_phone if member.deleted_at and member.deleted_phone else member.phone
     data.update(
         {
             "member_id": record.member_id,
-            "member_name_masked": mask_name(record.member.nickname),
-            "member_phone_masked": mask_phone(record.member.phone),
+            "member_name_masked": mask_name(member.nickname),
+            "member_phone_masked": mask_phone(phone),
         }
     )
     return data

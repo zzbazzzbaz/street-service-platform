@@ -87,3 +87,37 @@ class AdminPortalMembersApiTests(TestCase):
 
         self.assertEqual(response.status_code, 400)
         self.assertIn("驳回", response.json()["message"])
+
+    def test_member_soft_delete_archives_identity_and_hides_from_list(self):
+        member = create_member(
+            openid="user-openid",
+            username="13800000009",
+            phone="13800000009",
+            nickname="待删除用户",
+        )
+
+        response = self.client.delete(f"/api/admin/members/{member.id}?reason=重复账号", **self.headers)
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.json()["data"]["deleted"])
+
+        member.refresh_from_db()
+        self.assertIsNotNone(member.deleted_at)
+        self.assertFalse(member.is_active)
+        self.assertEqual(member.deleted_username, "13800000009")
+        self.assertEqual(member.deleted_phone, "13800000009")
+        self.assertEqual(member.deleted_by_id, self.admin.id)
+        self.assertEqual(member.delete_reason, "重复账号")
+        self.assertEqual(member.username, f"deleted_{member.id}")
+        self.assertEqual(member.phone, f"deleted_{member.id}")
+
+        list_response = self.client.get("/api/admin/members?keyword=待删除用户", **self.headers)
+        self.assertEqual(list_response.json()["data"]["total"], 0)
+
+        # 原手机号可以重新注册
+        new_member = create_member(openid="new-openid", username="13800000009", phone="13800000009")
+        self.assertNotEqual(new_member.id, member.id)
+
+        # 重复删除返回错误
+        again = self.client.delete(f"/api/admin/members/{member.id}", **self.headers)
+        self.assertEqual(again.status_code, 400)
+        self.assertIn("已删除", again.json()["message"])

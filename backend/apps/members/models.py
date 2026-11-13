@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.db import models
 
 
@@ -42,6 +43,19 @@ class Member(models.Model):
     audit_remark = models.CharField("审核说明", max_length=255, blank=True)
     audit_submitted_at = models.DateTimeField("最近提交审核时间", null=True, blank=True)
     is_active = models.BooleanField("是否启用", default=True)
+    deleted_at = models.DateTimeField("删除时间", null=True, blank=True, db_index=True)
+    deleted_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="deleted_members",
+        verbose_name="删除人",
+    )
+    delete_reason = models.CharField("删除原因", max_length=255, blank=True)
+    deleted_username = models.CharField("原用户名", max_length=64, blank=True)
+    deleted_phone = models.CharField("原手机号", max_length=20, blank=True)
+    deleted_openid = models.CharField("原OpenID", max_length=128, blank=True)
     created_at = models.DateTimeField("创建时间", auto_now_add=True)
 
     class Meta:

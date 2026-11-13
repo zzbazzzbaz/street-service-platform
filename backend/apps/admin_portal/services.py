@@ -116,8 +116,8 @@ def dashboard_summary_data() -> dict:
     )
     total_points = merchant_payments.aggregate(total=Sum("amount"))["total"] or 0
     return {
-        "pending_member_audits": Member.objects.filter(audit_status=Member.AuditStatus.PENDING).count(),
-        "pending_merchant_audits": Merchant.objects.filter(audit_status=Merchant.AuditStatus.PENDING).count(),
+        "pending_member_audits": Member.objects.filter(deleted_at__isnull=True, audit_status=Member.AuditStatus.PENDING).count(),
+        "pending_merchant_audits": Merchant.objects.filter(deleted_at__isnull=True, audit_status=Merchant.AuditStatus.PENDING).count(),
         "pending_reports": Report.objects.filter(status=Report.Status.PENDING).count(),
         "pending_civic_feedbacks": CivicFeedback.objects.filter(status=CivicFeedback.Status.SUBMITTED).count(),
         "pending_problem_feedbacks": ProblemFeedback.objects.filter(status=ProblemFeedback.Status.SUBMITTED).count(),
@@ -143,6 +143,11 @@ def get_or_404(model, pk):
     if item is None:
         raise BusinessError("资源不存在", code=40400, status=404)
     return item
+
+
+def _ensure_not_deleted(obj) -> None:
+    if getattr(obj, "deleted_at", None) is not None:
+        raise BusinessError("该账号已删除")
 
 
 # ---------------------------------------------------------------------------
@@ -212,7 +217,7 @@ def reset_admin_user_password(user_id: int, *, password: str) -> dict:
 
 
 def members_data(*, keyword: str = "", audit_status: str = "", is_active: str = "", page: int = 1, page_size: int = 20) -> dict:
-    queryset = Member.objects.all()
+    queryset = Member.objects.filter(deleted_at__isnull=True)
     keyword = keyword.strip()
     if keyword:
         queryset = queryset.filter(
@@ -233,6 +238,7 @@ def members_data(*, keyword: str = "", audit_status: str = "", is_active: str = 
 
 def update_member(member_id: int, payload) -> dict:
     member = get_or_404(Member, member_id)
+    _ensure_not_deleted(member)
     old_phone = member.phone
     phone = payload.phone.strip()
     if phone and phone != old_phone:
@@ -276,13 +282,48 @@ def update_member(member_id: int, payload) -> dict:
 
 def set_member_status(member_id: int, *, is_active: bool) -> dict:
     member = get_or_404(Member, member_id)
+    _ensure_not_deleted(member)
     member.is_active = is_active
     member.save(update_fields=["is_active"])
     return member_data(member)
 
 
+def delete_member(member_id: int, *, operator, reason: str = "") -> dict:
+    """软删除会员：归档并改写唯一字段，保留全部关联数据。"""
+    member = get_or_404(Member, member_id)
+    if member.deleted_at is not None:
+        raise BusinessError("该账号已删除")
+    tombstone = f"deleted_{member.id}"
+    member.deleted_username = member.username or ""
+    member.deleted_phone = member.phone or ""
+    member.deleted_openid = member.openid or ""
+    member.username = tombstone
+    member.phone = tombstone
+    member.openid = tombstone
+    member.is_active = False
+    member.deleted_at = timezone.now()
+    member.deleted_by = operator
+    member.delete_reason = (reason or "").strip()
+    member.save(
+        update_fields=[
+            "deleted_username",
+            "deleted_phone",
+            "deleted_openid",
+            "username",
+            "phone",
+            "openid",
+            "is_active",
+            "deleted_at",
+            "deleted_by",
+            "delete_reason",
+        ]
+    )
+    return {"id": member.id, "deleted": True}
+
+
 def audit_member(member_id: int, *, action: str, remark: str) -> dict:
     member = get_or_404(Member, member_id)
+    _ensure_not_deleted(member)
     action = action.strip()
     remark = remark.strip()
     if action == "approve":
@@ -888,7 +929,7 @@ def save_exchange_rule(rule: PointExchangeRule, *, points_per_yuan: int | None =
 
 
 def merchants_data(*, keyword: str = "", is_active: str = "", audit_status: str = "", page: int = 1, page_size: int = 20) -> dict:
-    queryset = Merchant.objects.all()
+    queryset = Merchant.objects.filter(deleted_at__isnull=True)
     if keyword:
         queryset = queryset.filter(
             Q(openid__icontains=keyword)
@@ -907,6 +948,7 @@ def merchants_data(*, keyword: str = "", is_active: str = "", audit_status: str 
 
 def audit_merchant(merchant_id: int, *, action: str, remark: str) -> dict:
     merchant = get_or_404(Merchant, merchant_id)
+    _ensure_not_deleted(merchant)
     action = (action or "").strip()
     remark = (remark or "").strip()
     if action == "approve":
@@ -1032,6 +1074,7 @@ def create_merchant(payload) -> Merchant:
 
 def update_merchant(merchant_id: int, payload) -> Merchant:
     merchant = get_or_404(Merchant, merchant_id)
+    _ensure_not_deleted(merchant)
     old_phone = merchant.phone
     if payload.openid is not None:
         validate_merchant_unique(payload.openid, exclude_id=merchant.id)
@@ -1062,6 +1105,7 @@ def update_merchant(merchant_id: int, payload) -> Merchant:
 
 def reset_merchant_password(merchant_id: int, *, password: str) -> dict:
     merchant = get_or_404(Merchant, merchant_id)
+    _ensure_not_deleted(merchant)
     password = (password or "").strip()
     if len(password) < 6:
         raise BusinessError("密码长度至少 6 位")
@@ -1072,12 +1116,44 @@ def reset_merchant_password(merchant_id: int, *, password: str) -> dict:
     return {"id": merchant.id, "password_reset": True}
 
 
-def delete_merchant(merchant_id: int) -> dict:
+def set_merchant_status(merchant_id: int, *, is_active: bool) -> dict:
     merchant = get_or_404(Merchant, merchant_id)
-    if merchant.point_records.exists() or merchant.settlements.exists():
-        raise BusinessError("存在关联数据，不能删除")
-    merchant.delete()
-    return {"deleted": True}
+    _ensure_not_deleted(merchant)
+    merchant.is_active = is_active
+    merchant.save(update_fields=["is_active"])
+    return merchant_data(merchant)
+
+
+def delete_merchant(merchant_id: int, *, operator, reason: str = "") -> dict:
+    merchant = get_or_404(Merchant, merchant_id)
+    if merchant.deleted_at is not None:
+        raise BusinessError("该账号已删除")
+    tombstone = f"deleted_{merchant.id}"
+    merchant.deleted_username = merchant.username or ""
+    merchant.deleted_phone = merchant.phone or ""
+    merchant.deleted_openid = merchant.openid or ""
+    merchant.username = tombstone
+    merchant.phone = tombstone
+    merchant.openid = tombstone
+    merchant.is_active = False
+    merchant.deleted_at = timezone.now()
+    merchant.deleted_by = operator
+    merchant.delete_reason = (reason or "").strip()
+    merchant.save(
+        update_fields=[
+            "deleted_username",
+            "deleted_phone",
+            "deleted_openid",
+            "username",
+            "phone",
+            "openid",
+            "is_active",
+            "deleted_at",
+            "deleted_by",
+            "delete_reason",
+        ]
+    )
+    return {"id": merchant.id, "deleted": True}
 
 
 def merchant_payment_records_queryset(*, merchant_id: int | None = None, keyword: str = "", date_from=None, date_to=None, month: str = ""):

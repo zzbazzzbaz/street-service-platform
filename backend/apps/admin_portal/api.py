@@ -233,6 +233,15 @@ def admin_member_detail(request, member_id: int):
         return _business_error(exc)
 
 
+@router.delete("/members/{member_id}", response={200: SuccessResponse[dict], 400: ErrorResponse, 401: ErrorResponse, 403: ErrorResponse, 404: ErrorResponse})
+def admin_member_delete(request, member_id: int, reason: str = ""):
+    try:
+        admin = _admin_or_error(request)
+        return success_response(svc.delete_member(member_id, operator=admin, reason=reason))
+    except BusinessError as exc:
+        return _business_error(exc)
+
+
 @router.patch("/members/{member_id}", response={200: SuccessResponse[dict], 400: ErrorResponse, 401: ErrorResponse, 403: ErrorResponse, 404: ErrorResponse})
 def admin_member_update(request, member_id: int, payload: MemberUpdateIn):
     try:
@@ -1082,10 +1091,7 @@ def admin_merchant_point_records_by_merchant(request, merchant_id: int, keyword:
 def admin_merchant_status(request, merchant_id: int, payload: StatusIn):
     try:
         _admin_or_error(request)
-        merchant = svc.get_or_404(Merchant, merchant_id)
-        merchant.is_active = payload.is_active
-        merchant.save(update_fields=["is_active"])
-        return success_response(merchant_data(merchant))
+        return success_response(svc.set_merchant_status(merchant_id, is_active=payload.is_active))
     except BusinessError as exc:
         return _business_error(exc)
 
@@ -1172,10 +1178,10 @@ def admin_merchant_update(request, merchant_id: int, payload: MerchantUpdateIn):
 
 
 @router.delete("/merchants/{merchant_id}", response={200: SuccessResponse[dict], 400: ErrorResponse, 401: ErrorResponse, 403: ErrorResponse, 404: ErrorResponse})
-def admin_merchant_delete(request, merchant_id: int):
+def admin_merchant_delete(request, merchant_id: int, reason: str = ""):
     try:
-        _admin_or_error(request)
-        return success_response(svc.delete_merchant(merchant_id))
+        admin = _admin_or_error(request)
+        return success_response(svc.delete_merchant(merchant_id, operator=admin, reason=reason))
     except BusinessError as exc:
         return _business_error(exc)
 

@@ -71,17 +71,17 @@ def _token_identity(request) -> TokenIdentity:
 
 def _member_from_identity(identity: TokenIdentity) -> Member | None:
     if identity.subject_id:
-        return Member.objects.filter(pk=identity.subject_id).first()
+        return Member.objects.filter(pk=identity.subject_id, deleted_at__isnull=True).first()
     if identity.openid:
-        return Member.objects.filter(openid=identity.openid).first()
+        return Member.objects.filter(openid=identity.openid, deleted_at__isnull=True).first()
     return None
 
 
 def _merchant_from_identity(identity: TokenIdentity) -> Merchant | None:
     if identity.subject_id:
-        return Merchant.objects.filter(pk=identity.subject_id).first()
+        return Merchant.objects.filter(pk=identity.subject_id, deleted_at__isnull=True).first()
     if identity.openid:
-        return Merchant.objects.filter(openid=identity.openid).first()
+        return Merchant.objects.filter(openid=identity.openid, deleted_at__isnull=True).first()
     return None
 
 
