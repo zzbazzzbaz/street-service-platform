@@ -44,6 +44,7 @@ from apps.admin_portal.schemas import (
     MerchantIn,
     MerchantPointCodeCreateIn,
     MerchantPointCodeUpdateIn,
+    MerchantSortOrdersIn,
     MerchantUpdateIn,
     PasswordResetIn,
     ProblemFeedbackReplyIn,
@@ -1101,6 +1102,15 @@ def admin_merchant_password(request, merchant_id: int, payload: PasswordResetIn)
     try:
         _admin_or_error(request)
         return success_response(svc.reset_merchant_password(merchant_id, password=payload.password))
+    except BusinessError as exc:
+        return _business_error(exc)
+
+
+@router.put("/merchants/sort-orders", response={200: SuccessResponse[dict], 400: ErrorResponse, 401: ErrorResponse, 403: ErrorResponse})
+def admin_merchant_sort_orders(request, payload: MerchantSortOrdersIn):
+    try:
+        _admin_or_error(request)
+        return success_response(svc.update_merchant_sort_orders(payload.items))
     except BusinessError as exc:
         return _business_error(exc)
 

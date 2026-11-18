@@ -43,6 +43,7 @@ class Merchant(models.Model):
         default=AuditStatus.NONE,
     )
     audit_remark = models.CharField("审核意见", max_length=255, blank=True)
+    sort_order = models.PositiveIntegerField("排序值", null=True, blank=True, default=None, db_index=True)
     is_active = models.BooleanField("是否启用", default=True)
     deleted_at = models.DateTimeField("删除时间", null=True, blank=True, db_index=True)
     deleted_by = models.ForeignKey(

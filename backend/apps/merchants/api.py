@@ -1,3 +1,4 @@
+from django.db.models import F
 from django.shortcuts import get_object_or_404
 from ninja import Router
 from django_ratelimit.decorators import ratelimit
@@ -230,7 +231,15 @@ def public_merchants(request, page: int = 1, page_size: int = 20):
         return error_response(40001, str(exc), status=401)
     except BusinessError as exc:
         return error_response(exc.code, exc.message, status=exc.status, errors=exc.errors)
-    items, page_data = paginate_queryset(Merchant.objects.filter(is_active=True, deleted_at__isnull=True), page=page, page_size=page_size)
+    items, page_data = paginate_queryset(
+        Merchant.objects.filter(is_active=True, deleted_at__isnull=True).order_by(
+            F("sort_order").asc(nulls_last=True),
+            "-created_at",
+            "-id",
+        ),
+        page=page,
+        page_size=page_size,
+    )
     return success_response({"items": [public_merchant_data(item) for item in items], **page_data})
 
 

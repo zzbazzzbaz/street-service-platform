@@ -187,6 +187,8 @@ class AdminPortalAuthApiTests(TestCase):
         self.assertEqual(
             response.json()["data"],
             {
+                "total_merchants": 0,
+                "total_members": 0,
                 "pending_member_audits": 1,
                 "pending_merchant_audits": 0,
                 "pending_reports": 1,
@@ -199,3 +201,33 @@ class AdminPortalAuthApiTests(TestCase):
                 "pending_merchant_settlements": 1,
             },
         )
+
+    def test_admin_dashboard_summary_counts_approved_active_totals(self):
+        self.create_admin()
+        token = self.admin_login().json()["data"]["access_token"]
+        Member.objects.create(openid="approved-member", audit_status=Member.AuditStatus.APPROVED, is_active=True)
+        Member.objects.create(openid="disabled-member", audit_status=Member.AuditStatus.APPROVED, is_active=False)
+        Member.objects.create(openid="pending-member", audit_status=Member.AuditStatus.PENDING, is_active=True)
+        Member.objects.create(
+            openid="deleted-member",
+            audit_status=Member.AuditStatus.APPROVED,
+            is_active=True,
+            deleted_at=timezone.now(),
+        )
+        Merchant.objects.create(openid="approved-merchant", name="有效商户", audit_status=Merchant.AuditStatus.APPROVED, is_active=True)
+        Merchant.objects.create(openid="disabled-merchant", name="停用商户", audit_status=Merchant.AuditStatus.APPROVED, is_active=False)
+        Merchant.objects.create(openid="pending-merchant", name="待审核商户", audit_status=Merchant.AuditStatus.PENDING, is_active=True)
+        Merchant.objects.create(
+            openid="deleted-merchant",
+            name="已删除商户",
+            audit_status=Merchant.AuditStatus.APPROVED,
+            is_active=True,
+            deleted_at=timezone.now(),
+        )
+
+        response = self.client.get("/api/admin/dashboard/summary", HTTP_AUTHORIZATION=f"Bearer {token}")
+
+        self.assertEqual(response.status_code, 200)
+        data = response.json()["data"]
+        self.assertEqual(data["total_members"], 1)
+        self.assertEqual(data["total_merchants"], 1)

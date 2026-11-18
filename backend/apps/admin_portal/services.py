@@ -10,7 +10,7 @@ from django.contrib.auth import authenticate, get_user_model
 from django.contrib.auth.hashers import make_password
 from django.contrib.auth.models import update_last_login
 from django.db import transaction
-from django.db.models import Q, Sum
+from django.db.models import F, Q, Sum
 from django.utils import timezone
 
 from apps.activities.models import Activity, ActivityCheckin, ActivitySignup
@@ -116,6 +116,16 @@ def dashboard_summary_data() -> dict:
     )
     total_points = merchant_payments.aggregate(total=Sum("amount"))["total"] or 0
     return {
+        "total_merchants": Merchant.objects.filter(
+            deleted_at__isnull=True,
+            audit_status=Merchant.AuditStatus.APPROVED,
+            is_active=True,
+        ).count(),
+        "total_members": Member.objects.filter(
+            deleted_at__isnull=True,
+            audit_status=Member.AuditStatus.APPROVED,
+            is_active=True,
+        ).count(),
         "pending_member_audits": Member.objects.filter(deleted_at__isnull=True, audit_status=Member.AuditStatus.PENDING).count(),
         "pending_merchant_audits": Merchant.objects.filter(deleted_at__isnull=True, audit_status=Merchant.AuditStatus.PENDING).count(),
         "pending_reports": Report.objects.filter(status=Report.Status.PENDING).count(),
@@ -929,7 +939,7 @@ def save_exchange_rule(rule: PointExchangeRule, *, points_per_yuan: int | None =
 
 
 def merchants_data(*, keyword: str = "", is_active: str = "", audit_status: str = "", page: int = 1, page_size: int = 20) -> dict:
-    queryset = Merchant.objects.filter(deleted_at__isnull=True)
+    queryset = Merchant.objects.filter(deleted_at__isnull=True).order_by(F("sort_order").asc(nulls_last=True), "-created_at", "-id")
     if keyword:
         queryset = queryset.filter(
             Q(openid__icontains=keyword)
@@ -1039,6 +1049,15 @@ def clean_service_content(value: str) -> str:
     return value
 
 
+def validate_sort_order(value: int | None) -> int | None:
+    if value is not None and value < 0:
+        raise BusinessError(
+            "排序值不能小于 0",
+            errors={"sort_order": ["排序值不能小于 0"]},
+        )
+    return value
+
+
 def create_merchant(payload) -> Merchant:
     if not payload.name.strip():
         raise BusinessError("商户名称不能为空")
@@ -1052,6 +1071,7 @@ def create_merchant(payload) -> Merchant:
         raise BusinessError("密码长度至少 6 位")
     validate_coordinates(payload.latitude, payload.longitude)
     category_code = validate_merchant_category(payload.category_code)
+    sort_order = validate_sort_order(payload.sort_order)
     return Merchant.objects.create(
         openid=payload.openid.strip() or None,
         username=username or None,
@@ -1067,6 +1087,7 @@ def create_merchant(payload) -> Merchant:
         category_code=category_code,
         business_hours=clean_business_hours(payload.business_hours),
         service_content=clean_service_content(payload.service_content),
+        sort_order=sort_order,
         audit_status=Merchant.AuditStatus.APPROVED,
         is_active=payload.is_active,
     )
@@ -1093,6 +1114,8 @@ def update_merchant(merchant_id: int, payload) -> Merchant:
             setattr(merchant, field, value.strip() if isinstance(value, str) else value)
     if payload.category_code is not None:
         merchant.category_code = validate_merchant_category(payload.category_code)
+    if "sort_order" in payload.model_fields_set:
+        merchant.sort_order = validate_sort_order(payload.sort_order)
     if payload.latitude is not None or payload.longitude is not None:
         validate_coordinates(payload.latitude, payload.longitude)
         merchant.latitude = payload.latitude
@@ -1101,6 +1124,31 @@ def update_merchant(merchant_id: int, payload) -> Merchant:
         raise BusinessError("商户名称不能为空")
     merchant.save()
     return merchant
+
+
+@transaction.atomic
+def update_merchant_sort_orders(items) -> dict:
+    """批量更新商户展示排序，供后台拖拽排序后一次性保存。
+
+    `sort_order` 为 null 表示清除自定义排序；数值越小展示越靠前。
+    """
+    if not items:
+        raise BusinessError("排序列表不能为空")
+    merchant_ids = [item.merchant_id for item in items]
+    if len(merchant_ids) != len(set(merchant_ids)):
+        raise BusinessError("商户 ID 重复", errors={"items": ["商户 ID 重复"]})
+    merchants = {
+        merchant.id: merchant
+        for merchant in Merchant.objects.filter(id__in=merchant_ids, deleted_at__isnull=True)
+    }
+    if len(merchants) != len(merchant_ids):
+        raise BusinessError("存在不存在或已删除的商户", errors={"items": ["存在不存在或已删除的商户"]})
+    for item in items:
+        validate_sort_order(item.sort_order)
+    for item in items:
+        merchants[item.merchant_id].sort_order = item.sort_order
+    Merchant.objects.bulk_update(merchants.values(), ["sort_order"])
+    return {"updated": len(items)}
 
 
 def reset_merchant_password(merchant_id: int, *, password: str) -> dict:

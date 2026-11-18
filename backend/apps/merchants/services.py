@@ -46,6 +46,7 @@ def merchant_data(merchant: Merchant) -> dict:
         "service_content": merchant.service_content,
         "audit_status": merchant.audit_status,
         "audit_remark": merchant.audit_remark,
+        "sort_order": merchant.sort_order,
         "is_active": merchant.is_active,
         "is_deleted": merchant.deleted_at is not None,
         "deleted_at": merchant.deleted_at,
