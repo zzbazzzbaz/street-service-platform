@@ -14,7 +14,7 @@ class ReportsApiTests(TestCase):
             {
                 "category_code": "safety_hazard",
                 "description": "路口路灯夜间不亮",
-                "location": "椿树街道东口",
+                "location": "示例街道东口",
                 "image_urls": ["https://example.com/media/uploads/report/a.png"],
             },
             content_type="application/json",
@@ -37,7 +37,7 @@ class ReportsApiTests(TestCase):
             "/api/reports",
             {
                 "category_code": "safety_hazard",
-                "location": "椿树街道东口",
+                "location": "示例街道东口",
                 "image_urls": ["https://example.com/a.png"],
             },
             content_type="application/json",

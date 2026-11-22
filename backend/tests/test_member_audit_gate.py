@@ -12,7 +12,7 @@ class MemberAuditGateApiTests(TestCase):
 
         report_response = self.client.post(
             "/api/reports",
-            {"category_code": "safety_hazard", "location": "椿树街道东口"},
+            {"category_code": "safety_hazard", "location": "示例街道东口"},
             content_type="application/json",
             **headers,
         )
@@ -67,7 +67,7 @@ class MemberAuditGateApiTests(TestCase):
             {
                 "category_code": "safety_hazard",
                 "description": "路口路灯夜间不亮",
-                "location": "椿树街道东口",
+                "location": "示例街道东口",
                 "image_urls": ["https://example.com/a.png"],
             },
             content_type="application/json",

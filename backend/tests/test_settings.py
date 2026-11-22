@@ -4,11 +4,11 @@ from django.test import SimpleTestCase
 
 class SimpleUISettingsTests(SimpleTestCase):
     def test_default_allowed_hosts_include_frp_admin_domain(self):
-        self.assertIn("8000.frp.chatgqt.top", settings.ALLOWED_HOSTS)
+        self.assertIn("8000.example.com", settings.ALLOWED_HOSTS)
 
     def test_default_csrf_trusted_origins_include_frp_admin_domain(self):
-        self.assertIn("http://8000.frp.chatgqt.top", settings.CSRF_TRUSTED_ORIGINS)
-        self.assertIn("https://8000.frp.chatgqt.top", settings.CSRF_TRUSTED_ORIGINS)
+        self.assertIn("http://8000.example.com", settings.CSRF_TRUSTED_ORIGINS)
+        self.assertIn("https://8000.example.com", settings.CSRF_TRUSTED_ORIGINS)
 
     def test_simpleui_admin_menu_is_explicitly_configured(self):
         self.assertEqual(settings.INSTALLED_APPS[0], "simpleui")

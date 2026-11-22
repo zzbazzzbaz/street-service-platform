@@ -34,7 +34,7 @@ class AdminLearningAnnouncementTests(TestCase):
             "title": "富文本公告",
             "is_announcement": True,
             "content_type": "article",
-            "body": "<h2>标题</h2><p>正文</p><p><img src=\"https://commu.iloveminmeng.com/media/learning/a.jpg\"></p>",
+            "body": "<h2>标题</h2><p>正文</p><p><img src=\"https://example.com/media/learning/a.jpg\"></p>",
         }
         r = self.client.post("/api/admin/learning/contents", payload, content_type="application/json", **self.headers)
         cid = r.json()["data"]["id"]

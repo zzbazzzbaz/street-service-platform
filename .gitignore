@@ -1,4 +1,5 @@
 .DS_Store
+.idea/
 .worktrees/
 __pycache__/
 *.py[cod]
@@ -16,6 +17,9 @@ backend/.env
 
 docs/**/.tmp_ocr/
 docs/_chat/
+docs/归档/
+docs/superpowers/
+docs/API接口文档/
 
 # 视频录制
 视频录制/

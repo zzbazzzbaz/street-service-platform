@@ -20,8 +20,7 @@ backend/apps/             业务应用
 backend/config/           Django 配置和 API 路由入口
 backend/shared/           统一响应、认证、分页、Admin 公共能力
 backend/tests/            后端测试
-docs/API接口文档.md        API 联调文档
-docs/superpowers/         规格和实施计划
+docs/文档/                 API、架构、数据库与部署文档
 ```
 
 ## 本地启动
@@ -44,10 +43,10 @@ uv sync
 cp .env.example .env
 ```
 
-如果通过 frp 域名访问后台，并且 `.env` 中显式设置了 `DJANGO_ALLOWED_HOSTS`，需要把域名一起写入，例如：
+如果通过反向代理域名访问后台，并且 `.env` 中显式设置了 `DJANGO_ALLOWED_HOSTS`，需要把域名一起写入，例如：
 
 ```env
-DJANGO_ALLOWED_HOSTS=127.0.0.1,localhost,8000.frp.chatgqt.top
+DJANGO_ALLOWED_HOSTS=127.0.0.1,localhost,8000.example.com
 ```
 
 初始化数据库：
@@ -119,7 +118,7 @@ POST /api/merchant/auth/wechat-login
 > - 用户端注册 `POST /api/auth/register`（姓名/微信号/性别/手机号/职业/是否党员/住址），商户端注册 `POST /api/merchant/auth/register`（店铺名称/地址/服务内容/所属社区/商户性质/联系人/联系电话/营业时间）；
 > - 注册即登录，账号密码登录名 = 手机号，初始密码统一 `000000`，可在小程序内自助改密；
 > - 注册后 `audit_status=pending`，后台审核通过（`approved`）才是可用账户；被驳回后可在小程序内重新提交资料；
-> - 详情见 `docs/API接口文档/15-10.13注册审核流程接口变动.md`。
+> - 详情见 `docs/文档/后端API接口文档.md`。
 
 种子数据会创建学习内容、积分余额、活动报名和签到、助老反馈、随手拍上报、商户、积分兑换比例和商户积分支付流水，方便前端联调完整流程。
 
@@ -170,8 +169,7 @@ uv run python manage.py test tests.test_seed_mvp -v 2
 详细接口说明见：
 
 ```text
-docs/API接口文档/0-API接口文档.md
-docs/API接口文档/6-后台管理API替代DjangoAdmin接口文档.md
+docs/文档/后端API接口文档.md
 ```
 
 服务启动后也可以访问：
@@ -183,6 +181,7 @@ docs/API接口文档/6-后台管理API替代DjangoAdmin接口文档.md
 
 ## 说明
 
+- 本仓库为求职作品集展示版：已移除真实客户数据、内部需求文档与部署密钥，示例数据均为虚构。
 - 正式微信登录当前只保留请求形态，开发期使用测试 `openid` 登录。
 - SQLite 数据库和媒体文件位于 `backend/data/`，默认不提交到 Git。
 - Django Admin 是开发调试和应急排查入口，不是正式业务管理入口。

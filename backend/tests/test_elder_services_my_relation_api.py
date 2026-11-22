@@ -14,7 +14,7 @@ class MyRelationApiTests(TestCase):
         self.relation = ElderCareRelation.objects.create(
             member=self.member,
             elder_name="张阿姨",
-            elder_address="椿树街道幸福里 2 号楼",
+            elder_address="示例街道幸福里 2 号楼",
         )
 
     def test_returns_active_relation_for_current_member(self):
@@ -27,7 +27,7 @@ class MyRelationApiTests(TestCase):
         self.assertEqual(data["id"], self.relation.id)
         self.assertEqual(data["member_id"], self.member.id)
         self.assertEqual(data["elder_name"], "张阿姨")
-        self.assertEqual(data["elder_address"], "椿树街道幸福里 2 号楼")
+        self.assertEqual(data["elder_address"], "示例街道幸福里 2 号楼")
         self.assertTrue(data["is_active"])
 
     def test_returns_null_when_no_relation(self):
@@ -86,7 +86,7 @@ class DirectFeedbackApiTests(TestCase):
         self.relation = ElderCareRelation.objects.create(
             member=self.member,
             elder_name="张阿姨",
-            elder_address="椿树街道幸福里 2 号楼",
+            elder_address="示例街道幸福里 2 号楼",
         )
 
     def test_submit_feedback_without_task_id(self):
@@ -101,7 +101,7 @@ class DirectFeedbackApiTests(TestCase):
         self.assertEqual(data["relation_id"], self.relation.id)
         self.assertEqual(data["member_id"], self.member.id)
         self.assertEqual(data["elder_name"], "张阿姨")
-        self.assertEqual(data["elder_address"], "椿树街道幸福里 2 号楼")
+        self.assertEqual(data["elder_address"], "示例街道幸福里 2 号楼")
         self.assertEqual(data["status"], "pending")
         self.assertEqual(data["content"], "今天上门看望老人")
 

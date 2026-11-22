@@ -90,7 +90,7 @@ class MemberImportTests(ImportApiTestBase):
             "/api/admin/imports/members",
             MEMBER_HEADERS,
             [
-                ["13800138001", "张三", "男", "美团快递", "东松树10号", "是", "", "zs_wx", "2025-03-01 10:00:00"],
+                ["13800138001", "张三", "男", "美团快递", "示例区示例路10号", "是", "", "zs_wx", "2025-03-01 10:00:00"],
                 ["13800138002", "李四", "女", "顺丰快递", "西单大街1号", "否", "小李", "", ""],
             ],
         )
@@ -123,7 +123,7 @@ class MemberImportTests(ImportApiTestBase):
         self.upload(
             "/api/admin/imports/members",
             MEMBER_HEADERS,
-            [["13800138003", "王五", "男", "美团快递", "东松树10号", "否", "", "", ""]],
+            [["13800138003", "王五", "男", "美团快递", "示例区示例路10号", "否", "", "", ""]],
         )
         response = self.client.post(
             "/api/auth/login",
@@ -139,8 +139,8 @@ class MemberImportTests(ImportApiTestBase):
             "/api/admin/imports/members",
             MEMBER_HEADERS,
             [
-                ["13800138001", "张三", "男", "美团快递", "东松树10号", "否", "", "", ""],
-                ["13800009999", "李四", "男", "美团快递", "东松树10号", "否", "", "", ""],
+                ["13800138001", "张三", "男", "美团快递", "示例区示例路10号", "否", "", "", ""],
+                ["13800009999", "李四", "男", "美团快递", "示例区示例路10号", "否", "", "", ""],
             ],
         )
         self.assertEqual(response.status_code, 400)
@@ -160,7 +160,7 @@ class MemberImportTests(ImportApiTestBase):
             MEMBER_HEADERS,
             [
                 ["1380000", "张", "中", "程序员", "", "也许", "", "", ""],
-                ["13800138001", "张三", "男", "美团快递", "东松树10号", "否", "", "", ""],
+                ["13800138001", "张三", "男", "美团快递", "示例区示例路10号", "否", "", "", ""],
                 ["13800138001", "李四", "女", "顺丰快递", "西单大街1号", "是", "", "", ""],
             ],
         )
@@ -176,7 +176,7 @@ class MemberImportTests(ImportApiTestBase):
         response = self.upload(
             "/api/admin/imports/members",
             headers,
-            [["13800138001", "张三", "男", "东松树10号", "否", "", "", ""]],
+            [["13800138001", "张三", "男", "示例区示例路10号", "否", "", "", ""]],
         )
         self.assertEqual(response.status_code, 400)
         self.assertIn("模板缺少必填列", response.json()["message"])
@@ -186,14 +186,14 @@ class MemberImportTests(ImportApiTestBase):
         response = self.upload(
             "/api/admin/imports/members",
             MEMBER_HEADERS,
-            [["13800138001", "张三", "男", "美团快递", "东松树10号", "否", "", "", ""]],
+            [["13800138001", "张三", "男", "美团快递", "示例区示例路10号", "否", "", "", ""]],
             filename="导入.csv",
         )
         self.assertEqual(response.status_code, 400)
         self.assertIn(".xlsx", response.json()["message"])
 
     def test_import_requires_admin(self):
-        upload = build_upload(MEMBER_HEADERS, [["13800138001", "张三", "男", "美团快递", "东松树10号", "否", "", "", ""]])
+        upload = build_upload(MEMBER_HEADERS, [["13800138001", "张三", "男", "美团快递", "示例区示例路10号", "否", "", "", ""]])
         response = self.client.post("/api/admin/imports/members", {"file": upload})
         self.assertEqual(response.status_code, 401)
 
@@ -209,8 +209,8 @@ class MerchantImportTests(ImportApiTestBase):
                     "王店长",
                     "13900139001",
                     "零售商超",
-                    "东松树10号",
-                    "东松树社区",
+                    "示例区示例路10号",
+                    "示例社区",
                     "个体工商户",
                     "08:00-20:00",
                     "日用百货",
@@ -228,7 +228,7 @@ class MerchantImportTests(ImportApiTestBase):
         first = Merchant.objects.get(phone="13900139001")
         self.assertEqual(first.name, "便民超市")
         self.assertEqual(first.category_code, Merchant.CategoryCode.RETAIL)
-        self.assertEqual(first.community, "东松树社区")
+        self.assertEqual(first.community, "示例社区")
         self.assertEqual(first.business_hours, "08:00-20:00")
         self.assertEqual(first.latitude, 39.91)
         self.assertEqual(first.longitude, 116.38)
